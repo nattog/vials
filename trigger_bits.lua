@@ -25,7 +25,7 @@ function init()
   number = 0
   screenX = 0
   screenY = 0
-  selected = 1
+  selected = 0
   decimal_value = 0
   track = 1
   bpm = 120
@@ -58,10 +58,16 @@ end
 function count()
   local t
   for t = 1, 4 do
+    
+    -- wrap sequence
     if positions[t] >= #sequences[t] then
       positions[t] = 0
     end
+    
+    -- change position
     positions[t] = (positions[t] + 1)
+    
+    -- trigger note
     if sequences[t][positions[t]] == 1 then
       engine.trig(t-1)
     end
@@ -69,7 +75,7 @@ function count()
   print(positions[1], positions[2], positions[3], positions[4])
 end
 
-binaryLookup = {0, 1, 10, 11, 100, 
+local binaryLookup = {0, 1, 10, 11, 100, 
   101, 110, 111, 1000, 
   1001, 1010, 1011, 1100, 
   1101, 1110, 1111, 10000, 
@@ -78,14 +84,9 @@ binaryLookup = {0, 1, 10, 11, 100,
   11001, 11010, 11011, 11100,
   11101, 11110, 11111, 100000}
 
+sequences = {}
+local steps = { {0,0,0,0},{0,0,0,0},{0,0,0,0},{0,0,0,0}}
 
-
-steps = { {0,0,0,0},{0,0,0,0},{0,0,0,0},{0,0,0,0}
-}
-        
-sequences = {
-}
-        
 function redraw()
   screen.clear()
   screen.level(color)
@@ -194,10 +195,10 @@ function enc(n,d)
   redraw()
 end
 
-function binaryString(track)
-  x = ""
+ function binaryString(track)
+  local x = ""
   for i = 1, #steps[track] do
-    y = binaryLookup[steps[track][i]+1]
+    local y = binaryLookup[steps[track][i]+1]
     x = x .. y
     end
   return x
@@ -212,7 +213,7 @@ function split_str(str)
 end
 
 function generate_sequence(track)
-  seq_string = binaryString(track)
+  local seq_string = binaryString(track)
   local seq_tab = split_str(seq_string)
   return seq_tab
   end
@@ -224,5 +225,4 @@ function rotate(m)
   table.remove(m,#m)
   return m
   end
-  
   
