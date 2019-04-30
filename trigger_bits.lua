@@ -39,51 +39,70 @@ end
 
 local automatic = 0
 
+local tn = include('tunnels/lib/tunnel')
 
 function init()
+  
+  -- screen values
   color = 3
   valueColor = color + 5
   number = 0
   screenX = 0
   screenY = 0
-  selected = 0
-  decimal_value = 0
-  track = 1
-  bpm = 120
-  playing = false
-  reset = false
-  positions = {0, 0, 0, 0}
-  probs = {100, 100, 100, 100}
-  mutes = {0, 0, 0, 0}
   wordFont = 15
   numberFont = 23
+  
+  -- clock setup
+  clk.on_step = count
+  clk.on_select_internal = function() clk:start() external = false end
+  clk.on_select_external = reset_pattern
+  external = false
+
+  -- key setup
   KEY2_hold = false
   KEY3_hold = false
   calc_hold = false
   hold_count = 0
   calc_input = {}
-  meta_location = 0
-  external = false
   binaryInput = {0, 0, 0, 0, 0, 0, 0}
   loop = {0, 0, 0, 0}
+  
+  -- params
+  clk:add_clock_params()
+  params:add_separator()
+  for channel=1,4 do
+    ack.add_channel_params(channel)
+  end
+  ack.add_effects_params()
+  
+  -- sequence vars
+  selected = 0
+  decimal_value = 0
+  track = 1
+  bpm = 120
+  
+  playing = false
+  reset = false
+  positions = {0, 0, 0, 0}
+  meta_position = 0
+  probs = {100, 100, 100, 100}
+  mutes = {0, 0, 0, 0}
+  
   
   for i=1, 4 do
     sequences[i] = generate_sequence(track)
     track = track + 1
     end
   track = 1
-
   
-  clk.on_step = count
-  clk.on_select_internal = function() clk:start() external = false end
-  clk.on_select_external = reset_pattern
-  clk:add_clock_params()
-
-  params:add_separator()
-  for channel=1,4 do
-    ack.add_channel_params(channel)
+  -- tunnels
+  delay = 0
+  tn.init()
+  -- need to set to 0 here for some reason
+  for i=1, 4 do
+    softcut.level(i, 0)
   end
-  ack.add_effects_params()
+  softcut.buffer_clear()
   
   grid_redraw()
 end
@@ -97,11 +116,10 @@ end
 
 function count()
   local t
-  meta_location = meta_location % 16 + 1
+  meta_position = meta_position % 16 + 1
   grid_redraw()
 
   for t = 1, 4 do
-    
     -- wrap sequence
     if positions[t] >= #sequences[t] then
       positions[t] = 0
@@ -117,7 +135,6 @@ function count()
       end
     end
   end
-  print(positions[1], positions[2], positions[3], positions[4])
   redraw()
 end
 
@@ -224,6 +241,8 @@ end
 function position_vis()
   local phase
   if loop[track] > 0 then
+    print('track ' .. track)
+    print('value ' .. steps[track][loop[track]])
     phrase = dec_to_bin(steps[track][loop[track]])
   else
     phrase = binaryString(track)
@@ -247,12 +266,12 @@ end
 function stop()
   clk:stop()
   playing = false
-  meta_location = 0
+  meta_position = 0
   print('stop')
 end
 
 function reset_positions()
-  meta_location = 0
+  meta_position = 0
   positions = {0, 0, 0, 0}
 end
 
@@ -338,7 +357,9 @@ function enc(n,d)
       decimal_value = steps[track][selected+1]
       decimal_value = ((decimal_value + d) % 128) 
       steps[track][selected+1] = decimal_value
-      sequences[track] = generate_sequence(track)
+      if loop[track] == 0 then
+        sequences[track] = generate_sequence(track)
+      end
     elseif KEY3_hold == true then
       probs[track] = (probs[track] + d) % 101
     end
@@ -365,7 +386,6 @@ function loop_off()
 end
 
 
-
 function binaryString(track)
   local x = ""
   for i = 1, #steps[track] do
@@ -388,8 +408,6 @@ function generate_sequence(track)
   local seq_tab = split_str(seq_string)
   return seq_tab
   end
-  
-
 
 function rotate(m)
   table.insert(m,1,m[#m])
@@ -406,11 +424,26 @@ function concatenate_table(t)
   return x
   end
   
+--local tunnelgroup
+local tunnelmode = 2
+local tgroup
+local tunnelmodes_list
+local tunnelmodes = {"off", "fractal landscape", "disemboguement", "post-horizon", "coded air", "failing lantern", "blue cat", "crawler"}
+
+-- tunnels
+local function update_tunnels()
+  local tm = tunnelmode
+  local tg = tgroup
+  tn.randomize(tm, tg)
+end
+
+  
+-- GRID FUNCTIONS
 
 function grid_redraw()
   if g == nil then
     return
-  end  
+  end
   
   -- binary pattern leds
   for t=1, #binaryInput do 
@@ -423,7 +456,7 @@ function grid_redraw()
   end
   
   -- clock indicator
-  if meta_location % 4 == 0 then
+  if meta_position % 4 == 0 then
     g:led(16, 8, 6)
   else
     g:led(16, 8, 0)
@@ -442,6 +475,13 @@ function grid_redraw()
     else
       g:led(1, chan, 7)
     end
+  end
+  
+  -- tunnels
+  if delay == 0 then
+    g:led(11, 8, 1)
+  else
+    g:led(11, 8, 5)
   end
   
   -- 4x4 grid
@@ -479,13 +519,11 @@ end
 
   
 g.key = function(x,y,z)
-  print(x,y,z)
-  
-  
+
   -- trigger samples
   if x < 5 and y == 8 then
     if z==1 then engine.trig(x-1) 
-      g:led(x,y,15)
+      g:led(x,y,9)
       g:refresh()
     else 
       g:led(x,y,3)
@@ -500,8 +538,6 @@ g.key = function(x,y,z)
     else
       mutes[y] = 0
     end
-  redraw()
-  grid_redraw()
   end
   
   -- start/stop
@@ -512,7 +548,6 @@ g.key = function(x,y,z)
     else
       stop()
     end
-  grid_redraw()
   end
   
   -- reset sequences
@@ -531,8 +566,30 @@ g.key = function(x,y,z)
         loop_on(y)
       end
     end
+    print('loop track' .. y .. ' = ' .. loop[y])
+  end
+    
+  -- tunnels
+  if x == 11 and y == 8 then
+    if z == 1 then
+      softcut.buffer_clear()
+      tunnelmode = tunnelmodes[math.random(2,8)]
+      print(tunnelmode)
+      tgroup = 1
+      update_tunnels(tunnelmode)
+      delay = 1
+      audio.level_eng_cut(1)
+      audio.level_cut(0.7)
+      softcut.level(1, 0.8)
+      softcut.level(2, 0.8)
+    else
+      delay = 0
+      audio.level_eng_cut(0)
+      audio.level_cut(0.0)
+      -- softcut.level(1, 0)
+      -- softcut.level(2, 0)
+    end
     grid_redraw()
-    print('loop ' .. y .. ' = ' .. loop[y])
   end
     
   -- binary input
@@ -548,7 +605,7 @@ g.key = function(x,y,z)
       end
     else 
       binaryInput[x] = 1
-      g:led(x, y, 15)
+      g:led(x, y, 9)
     end
     
     -- send input
@@ -558,7 +615,7 @@ g.key = function(x,y,z)
     g:refresh()
   end
 
-  -- nav
+   -- nav
   if x == 15 and y == 1 and z == 1 then
     track = track - z
     if track == 0 then
@@ -575,13 +632,11 @@ g.key = function(x,y,z)
     selected = (selected - z) % 4
     decimal_value = steps[track][selected+1]
     binaryInput = split_str(dec_to_bin(decimal_value))
-    print(binaryInput[1])
     end
   if x == 16 and y == 2 and z == 1 then
     selected = (selected + z) % 4
     decimal_value = steps[track][selected+1]
     binaryInput = split_str(dec_to_bin(decimal_value))
-    print(binaryInput[1])
     end
   redraw()
   
@@ -645,7 +700,9 @@ g.key = function(x,y,z)
   end
   steps[track][selected+1] = tonumber(final_input)
   decimal_value = steps[track][selected+1]
-  sequences[track] = generate_sequence(track)
+  if loop[track] == 0 or selected+1 == loop[track] then
+    sequences[track] = generate_sequence(track)
+  end
   redraw()
   
   else if z == 0 and x >= 10 and x < 13 and y < 5 then
