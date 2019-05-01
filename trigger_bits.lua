@@ -41,16 +41,42 @@ local automatic = 0
 
 local tn = include('tunnels/lib/tunnel')
 
-function init()
   
-  -- screen values
-  color = 3
-  valueColor = color + 5
-  number = 0
-  screenX = 0
-  screenY = 0
-  wordFont = 15
-  numberFont = 23
+-- screen values
+local color = 3
+local valueColor = color + 5
+local number = 0
+local screenX = 0
+local screenY = 0
+local wordFont = 15
+local numberFont = 23
+  
+-- key setup
+local KEY2_hold = false
+local KEY3_hold = false
+local calc_hold = false
+local hold_count = 0
+local calc_input = {}
+local binaryInput = {0, 0, 0, 0, 0, 0, 0}
+local loop = {0, 0, 0, 0}
+  
+-- sequence vars
+selected = 0
+decimal_value = 0
+track = 1
+local bpm = 120
+  
+local playing = false
+local reset = false
+local positions = {0, 0, 0, 0}
+meta_position = 0
+local probs = {100, 100, 100, 100}
+local mutes = {0, 0, 0, 0}
+track_divs = {1, 1, 1, 1}
+div_options = {"1", "1/2", "1/3", "1/4", "1/6", "1/8", "1/12", "1/16", "1/24", "1/32", "1/48", "1/64"}
+  
+
+function init()
   
   -- clock setup
   clk.on_step = count
@@ -58,15 +84,7 @@ function init()
   clk.on_select_external = reset_pattern
   external = false
 
-  -- key setup
-  KEY2_hold = false
-  KEY3_hold = false
-  calc_hold = false
-  hold_count = 0
-  calc_input = {}
-  binaryInput = {0, 0, 0, 0, 0, 0, 0}
-  loop = {0, 0, 0, 0}
-  
+
   -- params
   clk:add_clock_params()
   params:add_separator()
@@ -74,20 +92,6 @@ function init()
     ack.add_channel_params(channel)
   end
   ack.add_effects_params()
-  
-  -- sequence vars
-  selected = 0
-  decimal_value = 0
-  track = 1
-  bpm = 120
-  
-  playing = false
-  reset = false
-  positions = {0, 0, 0, 0}
-  meta_position = 0
-  probs = {100, 100, 100, 100}
-  mutes = {0, 0, 0, 0}
-  
   
   for i=1, 4 do
     sequences[i] = generate_sequence(track)
@@ -113,6 +117,18 @@ function reset_pattern()
   positions = {0, 0, 0, 0}
 end
 
+function clock_divider(track)
+  div = split(div_options[track_divs[track]], '/')
+  return tonumber(div[#div])
+end
+
+function split(s, delimiter)
+    result = {};
+    for match in (s..delimiter):gmatch("(.-)"..delimiter) do
+        table.insert(result, match);
+    end
+    return result;
+end
 
 function count()
   local t
@@ -120,21 +136,23 @@ function count()
   grid_redraw()
 
   for t = 1, 4 do
-    -- wrap sequence
-    if positions[t] >= #sequences[t] then
-      positions[t] = 0
-    end
-    
-    -- change position
-    positions[t] = (positions[t] + 1)
-
-    -- trigger note
-    if sequences[t][positions[t]] == 1 then
-      if math.random(100) <= probs[t] and mutes[t] == 0 then
-        engine.trig(t-1)
+    if meta_position % clock_divider(t) == 0 then
+      -- wrap sequence
+      if positions[t] >= #sequences[t] then
+        positions[t] = 0
+      end
+      
+      -- change position
+      positions[t] = (positions[t] + 1)
+  
+      -- trigger note
+      if sequences[t][positions[t]] == 1 then
+        if math.random(100) <= probs[t] and mutes[t] == 0 then
+          engine.trig(t-1)
+        end
       end
     end
-  end
+    end
   redraw()
 end
 
@@ -166,10 +184,8 @@ function redraw()
   screen.clear()
   screen.level(color)
   screen.font_face(wordFont)
-  screen.font_size(9)
+  screen.font_size(8)
   screen.move(0,10)
-  screen.text("trigger bits")
-  screen.move(80, 10)
   screen.text("bpm ")
   screen.level(valueColor)
   if external then
@@ -178,6 +194,26 @@ function redraw()
   else
     screen.font_face(numberFont)
     screen.text(params:get("bpm"))
+  end
+  screen.move(42, 10)
+  screen.font_face(wordFont)
+  screen.level(color)
+
+  screen.text("swing ")
+  screen.font_face(numberFont)
+  screen.level(valueColor)
+
+  screen.text("50%")
+  screen.move(95, 10)
+  screen.level(color)
+  screen.font_face(wordFont)
+  screen.text("track ")
+  screen.level(valueColor)
+  screen.font_face(numberFont)
+  screen.text(track)
+  if mutes[track] == 1 then
+    screen.font_face(wordFont)
+    screen.text("m")
   end
   screen.move(0, 20)
   screen.font_size(6)
@@ -212,10 +248,10 @@ function redraw()
   screen.move(80, 32)
   screen.level(color)
   screen.font_face(wordFont)
-  screen.text("track ")
+  screen.text("div ")
   screen.level(valueColor)
   screen.font_face(numberFont)
-  screen.text(track)
+  screen.text(div_options[track_divs[track]])
   if mutes[track] == 1 then
     screen.font_face(wordFont)
     screen.text("m")
@@ -341,7 +377,7 @@ end
 
 function enc(n,d)
   -- change track
-  if n ==2 then
+  if n ==2 and KEY3_hold == false then
     track = track + d
     if track == 0 then
       track = 4
@@ -369,9 +405,15 @@ function enc(n,d)
   if n == 1 then
     params:delta("bpm", d)
   end
+  
+  if n == 2 and KEY3_hold == true then
+    track_divs[track] = (track_divs[track] % #div_options + d)
+  end
   redraw()
   grid_redraw()
 end
+
+
 
 function loop_on(chan)
   bin = dec_to_bin(steps[chan][loop[chan]])
