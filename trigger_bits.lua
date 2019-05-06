@@ -560,9 +560,9 @@ function grid_redraw()
   -- binary pattern leds
   for iter = 1, 8 do
     if binaryInput[iter] == 1 then
-      g:led(iter, 7, 9)
+      g:led(iter, 7, 15)
     elseif binaryInput[iter] == 0 then
-      g:led(iter, 7, 5)
+      g:led(iter, 7, 7)
     elseif binaryInput[iter] == nil then
       g:led(iter, 7, 2)
     elseif iter > #binaryInput then
@@ -573,44 +573,44 @@ function grid_redraw()
   local t
   -- sample triggers
   for t = 1, 4 do
-    g:led(1, t, 3)
+    g:led(1, t, 7)
   end
 
   -- clock indicator
   if meta_position % 4 == 0 then
-    g:led(16, 8, 6)
+    g:led(16, 8, 15)
   else
-    g:led(16, 8, 0)
+    g:led(16, 8, 5)
   end
   if playing == false then
-    g:led(16, 8, 2)
+    g:led(16, 8, 3)
   end
 
   -- reset
-  g:led(16, 7, 2)
+  g:led(16, 7, 5)
 
   -- track mutes
   local chan
   for chan = 1, 4 do
     if mutes[chan] == 0 then
-      g:led(2, chan, 2)
+      g:led(2, chan, 5)
     else
-      g:led(2, chan, 7)
+      g:led(2, chan, 15)
     end
   end
 
   -- tunnels
   if delay == 0 then
-    g:led(11, 8, 2)
+    g:led(11, 8, 3)
   else
-    g:led(11, 8, 5)
+    g:led(11, 8, 15)
   end
 
   -- 4x4 location
   local tr
   for tr = 1, 4 do
     if tr == track then
-      g:led(4, tr, 2)
+      g:led(4, tr, 5)
     else
       g:led(4, tr, 0)
     end
@@ -618,7 +618,7 @@ function grid_redraw()
   local sel
   for sel = 0, 3 do
     if sel == selected then
-      g:led(sel + 5, 5, 2)
+      g:led(sel + 5, 5, 5)
     else
       g:led(sel + 5, 5, 0)
     end
@@ -628,30 +628,30 @@ function grid_redraw()
   local c
   for c = 1, 4 do
     for r = 5, 8 do
-      g:led(r, c, 3)
+      g:led(r, c, 7)
     end
   end
 
   local y
   for y = 1, 4 do
     if loop[y] > 0 then
-      g:led(loop[y] + 4, y, 6)
+      g:led(loop[y] + 4, y, 15)
     end
   end
 
   -- navigation
-  g:led(15, 1, 3)
-  g:led(15, 3, 3)
-  g:led(14, 2, 3)
-  g:led(16, 2, 3)
+  g:led(15, 1, 7)
+  g:led(15, 3, 7)
+  g:led(14, 2, 7)
+  g:led(16, 2, 7)
 
   --  calculator
   local u
   for u = 1, 3 do
     for v = 1, 3 do
-      g:led(u + 9, v, 3)
+      g:led(u + 9, v, 7)
     end
-    g:led(11, 4, 3)
+    g:led(11, 4, 7)
   end
 
   -- calc_hold
@@ -684,6 +684,17 @@ g.key = function(x, y, z)
     reset_positions()
   end
 
+  -- track/selec nav
+  if x == 4 and y < 5 then
+    track = y
+    decimal_value = steps[track][selected + 1]
+    binaryInput = split_str(dec_to_bin(decimal_value))
+  end
+  if y == 5 and x > 4 and x < 9 then
+    selected = x - 5
+    decimal_value = steps[track][selected + 1]
+    binaryInput = split_str(dec_to_bin(decimal_value))
+  end
   -- loop
   if x >= 5 and x < 9 and y < 5 then
     if z == 1 then
