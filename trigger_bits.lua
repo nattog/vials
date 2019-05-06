@@ -56,8 +56,8 @@ local KEY3_hold = false
 local calc_hold = false
 local hold_count = 0
 local calc_input = {}
-local binaryInput = {nil, nil, nil, nil, nil, nil, nil}
-local loop = {0, 0, 0, 0}
+binaryInput = {nil, nil, nil, nil, nil, nil, nil}
+loop = {0, 0, 0, 0}
 
 -- sequence vars
 selected = 0
@@ -68,11 +68,11 @@ local bpm = 120
 local playing = false
 local reset = false
 local positions = {0, 0, 0, 0}
-meta_position = 0
+local meta_position = 0
 local probs = {100, 100, 100, 100}
 local mutes = {0, 0, 0, 0}
-track_divs = {1, 1, 1, 1}
-div_options = {'1', '1/2', '1/3', '1/4', '1/6', '1/8', '1/12', '1/16', '1/24', '1/32', '1/48', '1/64'}
+local track_divs = {1, 1, 1, 1}
+local div_options = {'1', '1/2', '1/3', '1/4', '1/6', '1/8', '1/12', '1/16', '1/24', '1/32', '1/48', '1/64'}
 
 function init()
   -- clock setup
@@ -136,7 +136,7 @@ function count()
   grid_redraw()
 
   for t = 1, 4 do
-    if meta_position % clock_divider(t) == 0 then
+    if meta_position % clock_divider(t) == 0 or meta_position == 1 then
       -- wrap sequence
       if positions[t] >= #sequences[t] then
         positions[t] = 0
@@ -186,7 +186,7 @@ function redraw()
   screen.text('bpm ')
   screen.level(valueColor)
   if external then
-    screen.font_face(wordFont)
+    screen.font_face(1)
     screen.text('ext')
   else
     screen.font_face(numberFont)
@@ -266,8 +266,6 @@ end
 function position_vis()
   local phase
   if loop[track] > 0 then
-    print('track ' .. track)
-    print('value ' .. steps[track][loop[track]])
     phrase = dec_to_bin(steps[track][loop[track]])
   else
     phrase = binaryString(track)
@@ -301,6 +299,7 @@ end
 function change_selected(inp)
   selected = (selected + inp) % 4
   decimal_value = steps[track][selected + 1]
+  calc_binary_input()
   grid_redraw()
 end
 
@@ -336,7 +335,6 @@ function key(n, z)
   end
 
   -- ROTATE
-
   if n == 2 and z == 1 and KEY3_hold == true then
     local rotation = rotate(steps[track])
     steps[track] = rotation
@@ -345,7 +343,7 @@ function key(n, z)
 
   -- RESET
   if n == 3 and z == 1 and KEY2_hold == false then
-    reset_positions()
+    KEY3_hold = true
   end
 
   -- MUTE TRACK
@@ -389,7 +387,16 @@ function enc(n, d)
   end
 
   if n == 2 and KEY3_hold == true then
-    track_divs[track] = (track_divs[track] % #div_options + d)
+    local div_amt = track_divs[track]
+    if div_amt <= #div_options then
+      if div_amt == 1 and d == -1 then
+        track_divs[track] = 1
+      elseif div_amt == 12 and d == 1 then
+        track_divs[track] = 12
+      else
+        track_divs[track] = div_amt + d
+      end
+    end
   end
   redraw()
   grid_redraw()
@@ -426,8 +433,10 @@ end
 function binaryString(track)
   local x = ''
   for i = 1, #steps[track] do
-    local y = dec_to_bin(steps[track][i])
-    x = x .. y
+    if check_nil(binaryInput) ~= true then
+      local y = dec_to_bin(steps[track][i])
+      x = x .. y
+    end
   end
   return x
 end
@@ -514,6 +523,8 @@ local function make_nil(t, ind)
       t[iter] = nil
     end
   end
+  decimal_value = 0
+  calc_binary_input()
   return t
 end
 
@@ -528,7 +539,7 @@ local function tally(t)
   return freq
 end
 
-local function check_nil(t)
+function check_nil(t)
   local iter
   for iter = 1, #t do
     if t[iter] ~= nil then
@@ -549,13 +560,13 @@ function grid_redraw()
   -- binary pattern leds
   for iter = 1, 8 do
     if binaryInput[iter] == 1 then
-      g:led(iter, 7, 7)
+      g:led(iter, 7, 9)
     elseif binaryInput[iter] == 0 then
-      g:led(iter, 7, 3)
+      g:led(iter, 7, 5)
     elseif binaryInput[iter] == nil then
-      g:led(iter, 7, 1)
+      g:led(iter, 7, 2)
     elseif iter > #binaryInput then
-      g:led(iter, 7, 1)
+      g:led(iter, 7, 2)
     end
   end
 
@@ -590,7 +601,7 @@ function grid_redraw()
 
   -- tunnels
   if delay == 0 then
-    g:led(11, 8, 1)
+    g:led(11, 8, 2)
   else
     g:led(11, 8, 5)
   end
@@ -649,18 +660,6 @@ function grid_redraw()
 end
 
 g.key = function(x, y, z)
-  -- trigger samples
-  if x == 1 and y < 5 then
-    if z == 1 then
-      engine.trig(y - 1)
-      g:led(x, y, 9)
-      g:refresh()
-    else
-      g:led(x, y, 3)
-      g:refresh()
-    end
-  end
-
   -- mute track
   if x == 2 and y < 5 and z == 1 then
     if mutes[y] == 0 then
@@ -736,8 +735,10 @@ g.key = function(x, y, z)
       steps[track][selected + 1] = 0
       decimal_value = 0
     end
-    if loop[track] == 0 or selected + 1 == loop[track] then
+    if loop[track] == 0 then
       sequences[track] = generate_sequence(track)
+    elseif selected + 1 == loop[track] then
+      loop_on(track)
     end
     grid_redraw()
   end
@@ -772,13 +773,10 @@ g.key = function(x, y, z)
         end
       elseif binaryInput[x] == 1 then
         local ind1 = first_index(binaryInput)
-        print('x = 0' .. x)
-        print('binaryInput[x] = ' .. binaryInput[x])
-        print('tally ' .. tally(binaryInput))
-        print('firstindex ' .. ind1)
         if x == ind1 then
           if tally(binaryInput) == 1 then
             make_nil(binaryInput, ind1)
+            decimal_value = 0
           else
             binaryInput[x] = nil
             local indexx = first_index(binaryInput)
@@ -793,11 +791,18 @@ g.key = function(x, y, z)
         end
       end
     end
-    binary = concatenate_table(binaryInput)
-    steps[track][selected + 1] = tonumber(binary, 2)
+    local binary = concatenate_table(binaryInput)
+    local newNumber = tonumber(binary, 2)
+    if newNumber ~= nil then
+      steps[track][selected + 1] = newNumber
+    else
+      steps[track][selected + 1] = 0
+    end
     decimal_value = steps[track][selected + 1]
-    if loop[track] == 0 or selected + 1 == loop[track] then
+    if loop[track] == 0 then
       sequences[track] = generate_sequence(track)
+    elseif selected + 1 == loop[track] then
+      loop_on(track)
     end
     g:refresh()
   end
@@ -829,7 +834,6 @@ g.key = function(x, y, z)
     decimal_value = steps[track][selected + 1]
     binaryInput = split_str(dec_to_bin(decimal_value))
   end
-  redraw()
 
   if calc_hold == true then
     g:led(15, 2, 15)
@@ -893,8 +897,10 @@ g.key = function(x, y, z)
     end
     steps[track][selected + 1] = tonumber(final_input)
     decimal_value = steps[track][selected + 1]
-    if loop[track] == 0 or selected + 1 == loop[track] then
+    if loop[track] == 0 then
       sequences[track] = generate_sequence(track)
+    elseif selected + 1 == loop[track] then
+      loop_on(track)
     end
     calc_binary_input()
     redraw()
@@ -916,4 +922,14 @@ g.key = function(x, y, z)
   g:refresh()
   grid_redraw()
   redraw()
+
+  -- trigger samples
+  if x == 1 and y < 5 then
+    if z == 1 then
+      engine.trig(y - 1)
+      g:led(x, y, 9)
+    else
+      g:led(x, y, 3)
+    end
+  end
 end
