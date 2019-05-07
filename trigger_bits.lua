@@ -71,6 +71,7 @@ local positions = {0, 0, 0, 0}
 local meta_position = 0
 local probs = {100, 100, 100, 100}
 local mutes = {0, 0, 0, 0}
+rotations = {0, 0, 0, 0}
 local track_divs = {1, 1, 1, 1}
 local div_options = {'1', '1/2', '1/3', '1/4', '1/6', '1/8', '1/12', '1/16', '1/24', '1/32', '1/48', '1/64'}
 
@@ -209,6 +210,8 @@ function redraw()
   screen.font_face(15)
   screen.level(color)
   position_vis()
+  screen.move((rotations[track] + 0.2) * 3.9999, 21)
+  screen.text('_')
   screen.font_face(numberFont)
   screen.font_size(8)
   screenY = 32
@@ -270,6 +273,19 @@ function position_vis()
   else
     phrase = binaryString(track)
   end
+
+  -- rotate!!
+  local temp = {}
+  phrase:gsub(
+    '.',
+    function(c)
+      table.insert(temp, c)
+    end
+  )
+  phrase_rotated = rotate(temp, rotations[track])
+  phrase = concatenate_table(phrase_rotated)
+
+  --
   if positions[track] > 0 then
     screen.text(string.sub(phrase, 1, positions[track] - 1))
   end
@@ -336,8 +352,10 @@ function key(n, z)
 
   -- ROTATE
   if n == 2 and z == 1 and KEY3_hold == true then
-    local rotation = rotate(steps[track])
-    steps[track] = rotation
+    rotations[track] = rotations[track] + 1
+    if rotations[track] == #sequences[track] then
+      rotations[track] = 0
+    end
     sequences[track] = generate_sequence(track)
   end
 
@@ -433,7 +451,7 @@ end
 function binaryString(track)
   local x = ''
   for i = 1, #steps[track] do
-    if check_nil(binaryInput) ~= true then
+    if steps[track][i] ~= nil and steps[track][i] ~= 0 then
       local y = dec_to_bin(steps[track][i])
       x = x .. y
     end
@@ -452,12 +470,24 @@ end
 function generate_sequence(track)
   local seq_string = binaryString(track)
   local seq_tab = split_str(seq_string)
-  return seq_tab
+  local seq_rotates = rotate(seq_tab, rotations[track])
+  return seq_rotates
 end
 
-function rotate(m)
-  table.insert(m, 1, m[#m])
-  table.remove(m, #m)
+function rotate(m, dir)
+  if dir > 0 then
+    while dir ~= 0 do
+      table.insert(m, 1, m[#m])
+      table.remove(m, #m)
+      dir = dir - 1
+    end
+  elseif dir < 0 then
+    while dir ~= 0 do
+      table.insert(m, m[#m], 1)
+      table.remove(m, 1)
+      dir = dir + 1
+    end
+  end
   return m
 end
 
@@ -644,6 +674,10 @@ function grid_redraw()
   g:led(15, 3, 7)
   g:led(14, 2, 7)
   g:led(16, 2, 7)
+
+  -- rotator
+  g:led(14, 5, 5)
+  g:led(16, 5, 5)
 
   --  calculator
   local u
@@ -930,6 +964,22 @@ g.key = function(x, y, z)
     -- print(x,y,z)
     end
   end
+
+  -- rotator
+  if x == 14 and y == 5 and z == 1 then
+    rotations[track] = rotations[track] - 1
+    if rotations[track] == -1 then
+      rotations[track] = #sequences[track] - 1
+    end
+    sequences[track] = generate_sequence(track)
+  elseif x == 16 and y == 5 and z == 1 then
+    rotations[track] = rotations[track] + 1
+    if rotations[track] >= #sequences[track] then
+      rotations[track] = 0
+    end
+    sequences[track] = generate_sequence(track)
+  end
+
   g:refresh()
   grid_redraw()
   redraw()
