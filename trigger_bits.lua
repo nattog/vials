@@ -28,6 +28,7 @@ engine.name = 'Ack'
 local ack = require 'ack/lib/ack'
 local BeatClock = require 'beatclock'
 local ControlSpec = require 'controlspec'
+hs = include 'awake/lib/halfsecond'
 
 local g = grid.connect()
 
@@ -39,8 +40,6 @@ end
 
 local automatic = 0
 
-local tn = include('tunnels/lib/tunnel')
-
 -- screen values
 local color = 3
 local valueColor = color + 5
@@ -51,13 +50,14 @@ local wordFont = 15
 local numberFont = 23
 
 -- key setup
+local KEY1_hold = false
 local KEY2_hold = false
 local KEY3_hold = false
 local calc_hold = false
 local hold_count = 0
 local calc_input = {}
-binaryInput = {nil, nil, nil, nil, nil, nil, nil}
-loop = {0, 0, 0, 0}
+local binaryInput = {nil, nil, nil, nil, nil, nil, nil}
+local loop = {0, 0, 0, 0}
 
 -- sequence vars
 selected = 0
@@ -100,15 +100,10 @@ function init()
   end
   track = 1
 
-  -- tunnels
+  -- hs
   delay = 0
-  tn.init()
-  -- need to set to 0 here for some reason
-  for i = 1, 4 do
-    softcut.level(i, 0)
-  end
-  softcut.buffer_clear()
-
+  hs.init()
+  params:set('delay', delay)
   grid_redraw()
 end
 
@@ -137,7 +132,7 @@ function count()
   grid_redraw()
 
   for t = 1, 4 do
-    if meta_position % clock_divider(t) == 0 or meta_position == 1 then
+    if meta_position % clock_divider(t) == 0 then
       -- wrap sequence
       if positions[t] >= #sequences[t] then
         positions[t] = 0
@@ -179,91 +174,101 @@ sequences = {}
 steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 
 function redraw()
-  screen.clear()
-  screen.level(color)
-  screen.font_face(wordFont)
-  screen.font_size(8)
-  screen.move(0, 10)
-  screen.text('bpm ')
-  screen.level(valueColor)
-  if external then
-    screen.font_face(1)
-    screen.text('ext')
-  else
-    screen.font_face(numberFont)
-    screen.text(params:get('bpm'))
-  end
-
-  screen.move(80, 10)
-  screen.level(color)
-  screen.font_face(wordFont)
-  screen.text('track ')
-  screen.level(valueColor)
-  screen.font_face(numberFont)
-  screen.text(track)
-  if mutes[track] == 1 then
+  if delay == 0 then
+    screen.clear()
+    screen.level(color)
     screen.font_face(wordFont)
-    screen.text('m')
-  end
-  screen.move(0, 20)
-  screen.font_size(6)
-  screen.font_face(15)
-  screen.level(color)
-  position_vis()
-  screen.move((rotations[track] + 0.2) * 3.9999, 21)
-  screen.text('_')
-  screen.font_face(numberFont)
-  screen.font_size(8)
-  screenY = 32
-  screen.move(0, screenY)
-  for i = 1, #steps do
-    for j = 1, #steps[i] do
-      if i == track then
-        screen.level(valueColor)
-      end
-      screen.text(steps[i][j])
-      if i == track then
-        if j == selected + 1 then
-          screen.font_size(6)
-          screen.text('*')
-          screen.font_size(8)
+    screen.font_size(8)
+    screen.move(0, 10)
+    screen.text('bpm ')
+    screen.level(valueColor)
+    if external then
+      screen.font_face(1)
+      screen.text('ext')
+    else
+      screen.font_face(numberFont)
+      screen.text(params:get('bpm'))
+    end
+
+    screen.move(80, 10)
+    screen.level(color)
+    screen.font_face(wordFont)
+    screen.text('track ')
+    screen.level(valueColor)
+    screen.font_face(numberFont)
+    screen.text(track)
+    if mutes[track] == 1 then
+      screen.font_face(wordFont)
+      screen.text('m')
+    end
+    screen.move(0, 20)
+    screen.font_size(6)
+    screen.font_face(15)
+    screen.level(color)
+    position_vis()
+    screen.move((rotations[track] + 0.2) * 3.9999, 21)
+    screen.text('_')
+    screen.font_face(numberFont)
+    screen.font_size(8)
+    screenY = 32
+    screen.move(0, screenY)
+    for i = 1, #steps do
+      for j = 1, #steps[i] do
+        if i == track then
+          screen.level(valueColor)
         end
+        screen.text(steps[i][j])
+        if i == track then
+          if j == selected + 1 then
+            screen.font_size(6)
+            screen.text('*')
+            screen.font_size(8)
+          end
+        end
+        screen.level(color)
+        screenX = screenX + 20
+        screen.move(screenX, screenY)
       end
-      screen.level(color)
-      screenX = screenX + 20
+      screenX = 0
+      screenY = screenY + 10
       screen.move(screenX, screenY)
     end
-    screenX = 0
-    screenY = screenY + 10
-    screen.move(screenX, screenY)
-  end
-  screen.move(80, 32)
-  screen.level(color)
-  screen.font_face(wordFont)
-  screen.text('div ')
-  screen.level(valueColor)
-  screen.font_face(numberFont)
-  screen.text(div_options[track_divs[track]])
-  if mutes[track] == 1 then
+    screen.move(80, 32)
+    screen.level(color)
     screen.font_face(wordFont)
-    screen.text('m')
+    screen.text('div ')
+    screen.level(valueColor)
+    screen.font_face(numberFont)
+    screen.text(div_options[track_divs[track]])
+    screen.move(80, 42)
+    screen.level(color)
+    screen.font_face(wordFont)
+    screen.text('prob ')
+    screen.level(valueColor)
+    screen.font_face(numberFont)
+    screen.text(probs[track])
+    screen.move(80, 52)
+    screen.level(color)
+    screen.font_face(wordFont)
+    screen.text('binary')
+    screen.move(80, 62)
+    screen.level(valueColor)
+    screen.font_face(numberFont)
+    screen.text(dec_to_bin(decimal_value))
+    screen.update()
+  elseif delay == 1 then
+    screen.clear()
+    for i = 1, math.random(50) do
+      screen.font_face(math.random(40))
+      screen.level(math.random(50))
+      screen.font_size(math.random(20))
+      screenX = math.random(125)
+      screenY = math.random(80)
+      screen.move(screenX, screenY)
+      screen.text('echo')
+    end
+    screen.update()
   end
-  screen.move(80, 42)
-  screen.level(color)
-  screen.font_face(wordFont)
-  screen.text('prob ')
-  screen.level(valueColor)
-  screen.font_face(numberFont)
-  screen.text(probs[track])
-  screen.move(80, 52)
-  screen.level(color)
-  screen.font_face(wordFont)
-  screen.text('binary')
-  screen.move(80, 62)
-  screen.level(valueColor)
-  screen.font_face(numberFont)
-  screen.text(dec_to_bin(decimal_value))
-  screen.update()
 end
 
 function position_vis()
@@ -325,18 +330,30 @@ function key(n, z)
     automatic = automatic + 1
     if automatic % 2 == 1 then
       start()
+      KEY1_hold = true
     elseif automatic % 2 == 0 then
-      stop()
+      KEY1_hold = true
     end
   end
 
-  -- key 1 ALT === RESET to 0
-  if n == 1 and z == 1 and KEY3_hold == true then
+  if n == 1 and z == 0 then
+    KEY1_hold = false
+  end
+
+  -- reset
+  if n == 3 and z == 1 and KEY1_hold == true then
+    reset_positions()
+  end
+
+  -- stop
+
+  if n == 2 and z == 1 and KEY1_hold == true then
+    stop()
     reset_positions()
   end
 
   --key 2 CHANGE SLOT
-  if n == 2 and z == 1 and KEY3_hold == false then
+  if n == 2 and z == 1 and KEY1_hold == false then
     KEY2_hold = true
     change_selected(z)
   elseif n == 2 and z == 0 then
@@ -377,47 +394,57 @@ function key(n, z)
 end
 
 function enc(n, d)
-  -- change track
-  if n == 2 and KEY3_hold == false then
-    track = track + d
-    if track == 0 then
-      track = 4
+  if delay == 0 then
+    -- change track
+    if n == 2 and KEY3_hold == false then
+      track = track + d
+      if track == 0 then
+        track = 4
+      end
+      if track == 5 then
+        track = 1
+      end
+      decimal_value = steps[track][selected + 1]
+      calc_binary_input()
     end
-    if track == 5 then
-      track = 1
-    end
-    decimal_value = steps[track][selected + 1]
-    calc_binary_input()
-  end
 
-  -- change decimal
-  if n == 3 then
-    if KEY3_hold == false then
-      change_decimal(d)
-    elseif KEY3_hold == true then
-      probs[track] = (probs[track] + d) % 101
-    end
-  end
-
-  -- change bpm
-  if n == 1 then
-    params:delta('bpm', d)
-  end
-
-  if n == 2 and KEY3_hold == true then
-    local div_amt = track_divs[track]
-    if div_amt <= #div_options then
-      if div_amt == 1 and d == -1 then
-        track_divs[track] = 1
-      elseif div_amt == 12 and d == 1 then
-        track_divs[track] = 12
-      else
-        track_divs[track] = div_amt + d
+    -- change decimal
+    if n == 3 then
+      if KEY3_hold == false then
+        change_decimal(d)
+      elseif KEY3_hold == true then
+        probs[track] = (probs[track] + d) % 101
       end
     end
+
+    -- change bpm
+    if n == 1 then
+      params:delta('bpm', d)
+    end
+
+    if n == 2 and KEY3_hold == true then
+      local div_amt = track_divs[track]
+      if div_amt <= #div_options then
+        if div_amt == 1 and d == -1 then
+          track_divs[track] = 1
+        elseif div_amt == 12 and d == 1 then
+          track_divs[track] = 12
+        else
+          track_divs[track] = div_amt + d
+        end
+      end
+    end
+    redraw()
+    grid_redraw()
+  else
+    if n == 1 then
+      params:delta('delay', d)
+    elseif n == 2 then
+      params:delta('delay_rate', d)
+    elseif n == 3 then
+      params:delta('delay_feedback', d)
+    end
   end
-  redraw()
-  grid_redraw()
 end
 
 function change_decimal(d)
@@ -501,28 +528,6 @@ function concatenate_table(t)
     end
   end
   return x
-end
-
---local tunnelgroup
-local tunnelmode = 2
-local tgroup
-local tunnelmodes_list
-local tunnelmodes = {
-  'off',
-  'fractal landscape',
-  'disemboguement',
-  'post-horizon',
-  'coded air',
-  'failing lantern',
-  'blue cat',
-  'crawler'
-}
-
--- tunnels
-local function update_tunnels()
-  local tm = tunnelmode
-  local tg = tgroup
-  tn.randomize(tm, tg)
 end
 
 local function table_index(t)
@@ -629,7 +634,7 @@ function grid_redraw()
     end
   end
 
-  -- tunnels
+  -- delay
   if delay == 0 then
     g:led(11, 8, 3)
   else
@@ -743,27 +748,19 @@ g.key = function(x, y, z)
     print('loop track' .. y .. ' = ' .. loop[y])
   end
 
-  -- tunnels
+  -- delay
   if x == 11 and y == 8 then
     if z == 1 then
-      softcut.buffer_clear()
-      tunnelmode = tunnelmodes[math.random(2, 8)]
-      print(tunnelmode)
-      tgroup = 1
-      update_tunnels(tunnelmode)
       delay = 1
-      audio.level_eng_cut(1)
-      audio.level_cut(0.7)
-      softcut.level(1, 0.8)
-      softcut.level(2, 0.8)
+      params:set('delay', 0.7)
+      params:set('delay_time', (math.random(100)) / 100)
+      params:set('delay_feedback', (math.random(100)) / 100)
     else
-      -- softcut.level(1, 0)
-      -- softcut.level(2, 0)
       delay = 0
-      audio.level_eng_cut(0)
-      audio.level_cut(0.0)
+      params:set('delay', 0)
     end
     grid_redraw()
+    redraw()
   end
 
   -- turn to nil a binary bit
@@ -993,4 +990,8 @@ g.key = function(x, y, z)
       g:led(x, y, 3)
     end
   end
+end
+
+function cleanup()
+  clk:stop()
 end
