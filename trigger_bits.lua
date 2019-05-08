@@ -1,4 +1,4 @@
--- trigger bits
+-- not nil
 -- a binary rhythmbox
 -- v1.0 @nattog
 --
@@ -11,17 +11,54 @@
 -- concatenated into sequences
 --
 -- - - - - - - - - - - - - - - - -
--- k1 (hold) start/stop
+-- k1 (hold) start
+-- if playing hold k1 for
+-- PATTERN ALT
+--
 -- k2 change position
--- k3 reset sequence
+-- k3 (hold) TRACK ALT
 --
--- e1 change track
--- e2 change decimal
--- e3 change tempo
+-- e1 change tempo
+-- e2 change track
+-- e3 change decimal
 --
+-- k1 (hold) + k2 stops
+-- k1 (hold) + k3 resets
 -- k2 (hold) + k3 mute
--- k3 (hold) + k2 rotates track
+-- k3 (hold) + k2 rotates binary sequence
 -- k3 (hold) + e3 probability
+--
+--
+-- GRID (top-left clockwise)
+--
+-- sample triggers
+-- track mutes
+--
+-- 4x4 segment looper
+-- with additional nav support
+--
+-- phone pad style decimal input
+--
+-- track and segment navigation
+-- centre button holds numbers
+-- from phone pad for XX, XXX
+--
+-- rotate sequence >> or <<
+--
+-- reset all tracks to 0
+-- play/stop
+--
+-- echo
+-- level, rate and fbk
+-- controlled e1,e2,e3
+--
+-- binary input x1-x8, y7
+-- row below makes nil
+-- whats above
+--
+-- bug reports to @nattog
+-- thanks!
+--
 
 engine.name = 'Ack'
 
@@ -60,9 +97,9 @@ local binaryInput = {nil, nil, nil, nil, nil, nil, nil}
 local loop = {0, 0, 0, 0}
 
 -- sequence vars
-selected = 0
-decimal_value = 0
-track = 1
+local selected = 0
+local decimal_value = 0
+local track = 1
 local bpm = 120
 
 local playing = false
@@ -71,54 +108,36 @@ local positions = {0, 0, 0, 0}
 local meta_position = 0
 local probs = {100, 100, 100, 100}
 local mutes = {0, 0, 0, 0}
-rotations = {0, 0, 0, 0}
+local rotations = {0, 0, 0, 0}
 local track_divs = {1, 1, 1, 1}
 local div_options = {'1', '1/2', '1/3', '1/4', '1/6', '1/8', '1/12', '1/16', '1/24', '1/32', '1/48', '1/64'}
+local sequences = {}
+local steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 
-function init()
-  -- clock setup
-  clk.on_step = count
-  clk.on_select_internal = function()
-    clk:start()
-    external = false
-  end
-
-  clk.on_select_external = reset_pattern
-  external = false
-
-  -- params
-  clk:add_clock_params()
-  params:add_separator()
-  for channel = 1, 4 do
-    ack.add_channel_params(channel)
-  end
-  ack.add_effects_params()
-
-  for i = 1, 4 do
-    sequences[i] = generate_sequence(track)
-    track = track + 1
-  end
-  track = 1
-
-  -- hs
-  delay = 0
-  hs.init()
-  params:set('delay', delay)
-  grid_redraw()
+local function start()
+  playing = true
+  clk:start()
 end
 
-function reset_pattern()
+local function stop()
+  clk:stop()
+  playing = false
+  meta_position = 0
+  print('stop')
+end
+
+local function reset_pattern()
   clk:reset()
   external = true
   positions = {0, 0, 0, 0}
 end
 
-function clock_divider(track)
-  div = split(div_options[track_divs[track]], '/')
-  return tonumber(div[#div])
+local function reset_positions()
+  meta_position = 0
+  positions = {0, 0, 0, 0}
 end
 
-function split(s, delimiter)
+local function split(s, delimiter)
   result = {}
   for match in (s .. delimiter):gmatch('(.-)' .. delimiter) do
     table.insert(result, match)
@@ -126,9 +145,31 @@ function split(s, delimiter)
   return result
 end
 
+local function clock_divider(track)
+  div = split(div_options[track_divs[track]], '/')
+  return tonumber(div[#div])
+end
+
+local function rotate(m, dir)
+  if dir > 0 then
+    while dir ~= 0 do
+      table.insert(m, 1, m[#m])
+      table.remove(m, #m)
+      dir = dir - 1
+    end
+  elseif dir < 0 then
+    while dir ~= 0 do
+      table.insert(m, m[#m], 1)
+      table.remove(m, 1)
+      dir = dir + 1
+    end
+  end
+  return m
+end
+
 function count()
   local t
-  meta_position = meta_position % 16 + 1
+  meta_position = (meta_position % 16) + 1
   grid_redraw()
 
   for t = 1, 4 do
@@ -149,10 +190,12 @@ function count()
       end
     end
   end
-  redraw()
+  if delay < 1 then
+    redraw()
+  end
 end
 
-function dec_to_bin(num)
+local function dec_to_bin(num)
   local total = 0
   local modifier = 0
   local value = ''
@@ -170,8 +213,161 @@ function dec_to_bin(num)
   return value
 end
 
-sequences = {}
-steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
+local function binaryString(track)
+  local x = ''
+  for i = 1, #steps[track] do
+    if steps[track][i] ~= nil and steps[track][i] ~= 0 then
+      local y = dec_to_bin(steps[track][i])
+      x = x .. y
+    end
+  end
+  return x
+end
+
+local function split_str(str)
+  local tab = {}
+  for i = 1, string.len(str) do
+    tab[i] = tonumber(string.sub(str, i, i))
+  end
+  return tab
+end
+
+local function calc_binary_input()
+  local bin_rep = tostring(dec_to_bin(decimal_value))
+  binaryInput = split_str(bin_rep)
+end
+
+local function generate_sequence(track)
+  local seq_string = binaryString(track)
+  local seq_tab = split_str(seq_string)
+  local seq_rotates = rotate(seq_tab, rotations[track])
+  return seq_rotates
+end
+
+local function change_selected(inp)
+  selected = (selected + inp) % 4
+  decimal_value = steps[track][selected + 1]
+  calc_binary_input()
+  grid_redraw()
+end
+
+function change_decimal(d)
+  decimal_value = ((steps[track][selected + 1] + d) % 256)
+  steps[track][selected + 1] = decimal_value
+  if loop[track] == 0 then
+    sequences[track] = generate_sequence(track)
+  end
+  calc_binary_input()
+  grid_redraw()
+end
+
+local function loop_on(chan)
+  local x
+  bin = dec_to_bin(steps[chan][loop[chan]])
+  x = tostring(bin)
+  sequences[chan] = split_str(x)
+  redraw()
+end
+
+local function loop_off()
+  sequences[track] = generate_sequence(track)
+  redraw()
+end
+
+local function concatenate_table(t)
+  local x = ''
+  local i
+  for i = 1, #t do
+    if t[i] ~= nil then
+      local y = t[i]
+      x = x .. y
+    end
+  end
+  return x
+end
+
+local function table_index(t)
+  local index = {}
+  for k, v in pairs(t) do
+    index[v] = k
+  end
+  return index[1]
+end
+
+local function first_index(t)
+  local iter
+  for iter = 1, #t do
+    if t[iter] == 1 then
+      return iter
+    end
+  end
+end
+
+local function make_nil(t, ind)
+  local iter
+  if ind > 1 then
+    for iter = 1, ind - 1 do
+      t[iter] = nil
+    end
+  else
+    for iter = 1, #t do
+      t[iter] = nil
+    end
+  end
+  decimal_value = 0
+  calc_binary_input()
+  return t
+end
+
+local function tally(t)
+  local freq = 0
+  local iter
+  for iter = 1, #t do
+    if t[iter] == 1 then
+      freq = freq + 1
+    end
+  end
+  return freq
+end
+
+local function check_nil(t)
+  local iter
+  for iter = 1, #t do
+    if t[iter] ~= nil then
+      return false
+    end
+  end
+  return true
+end
+
+local function position_vis()
+  local phase
+  if loop[track] > 0 then
+    phrase = dec_to_bin(steps[track][loop[track]])
+  else
+    phrase = binaryString(track)
+  end
+
+  -- rotate!!
+  local temp = {}
+  phrase:gsub(
+    '.',
+    function(c)
+      table.insert(temp, c)
+    end
+  )
+  phrase_rotated = rotate(temp, rotations[track])
+  phrase = concatenate_table(phrase_rotated)
+
+  --
+  if positions[track] > 0 then
+    screen.text(string.sub(phrase, 1, positions[track] - 1))
+  end
+  screen.level(valueColor)
+  screen.text(string.sub(phrase, positions[track], positions[track]))
+  screen.level(color)
+  screen.text(string.sub(phrase, positions[track] + 1, #phrase))
+end
 
 function redraw()
   if delay == 0 then
@@ -269,59 +465,6 @@ function redraw()
     end
     screen.update()
   end
-end
-
-function position_vis()
-  local phase
-  if loop[track] > 0 then
-    phrase = dec_to_bin(steps[track][loop[track]])
-  else
-    phrase = binaryString(track)
-  end
-
-  -- rotate!!
-  local temp = {}
-  phrase:gsub(
-    '.',
-    function(c)
-      table.insert(temp, c)
-    end
-  )
-  phrase_rotated = rotate(temp, rotations[track])
-  phrase = concatenate_table(phrase_rotated)
-
-  --
-  if positions[track] > 0 then
-    screen.text(string.sub(phrase, 1, positions[track] - 1))
-  end
-  screen.level(valueColor)
-  screen.text(string.sub(phrase, positions[track], positions[track]))
-  screen.level(color)
-  screen.text(string.sub(phrase, positions[track] + 1, #phrase))
-end
-
-function start()
-  playing = true
-  clk:start()
-end
-
-function stop()
-  clk:stop()
-  playing = false
-  meta_position = 0
-  print('stop')
-end
-
-function reset_positions()
-  meta_position = 0
-  positions = {0, 0, 0, 0}
-end
-
-function change_selected(inp)
-  selected = (selected + inp) % 4
-  decimal_value = steps[track][selected + 1]
-  calc_binary_input()
-  grid_redraw()
 end
 
 function key(n, z)
@@ -447,143 +590,6 @@ function enc(n, d)
   end
 end
 
-function change_decimal(d)
-  decimal_value = ((steps[track][selected + 1] + d) % 256)
-  steps[track][selected + 1] = decimal_value
-  if loop[track] == 0 then
-    sequences[track] = generate_sequence(track)
-  end
-  calc_binary_input()
-  grid_redraw()
-end
-
-function calc_binary_input()
-  local bin_rep = tostring(dec_to_bin(decimal_value))
-  binaryInput = split_str(bin_rep)
-end
-
-function loop_on(chan)
-  local x
-  bin = dec_to_bin(steps[chan][loop[chan]])
-  x = tostring(bin)
-  sequences[chan] = split_str(x)
-  redraw()
-end
-
-function loop_off()
-  sequences[track] = generate_sequence(track)
-  redraw()
-end
-
-function binaryString(track)
-  local x = ''
-  for i = 1, #steps[track] do
-    if steps[track][i] ~= nil and steps[track][i] ~= 0 then
-      local y = dec_to_bin(steps[track][i])
-      x = x .. y
-    end
-  end
-  return x
-end
-
-function split_str(str)
-  local tab = {}
-  for i = 1, string.len(str) do
-    tab[i] = tonumber(string.sub(str, i, i))
-  end
-  return tab
-end
-
-function generate_sequence(track)
-  local seq_string = binaryString(track)
-  local seq_tab = split_str(seq_string)
-  local seq_rotates = rotate(seq_tab, rotations[track])
-  return seq_rotates
-end
-
-function rotate(m, dir)
-  if dir > 0 then
-    while dir ~= 0 do
-      table.insert(m, 1, m[#m])
-      table.remove(m, #m)
-      dir = dir - 1
-    end
-  elseif dir < 0 then
-    while dir ~= 0 do
-      table.insert(m, m[#m], 1)
-      table.remove(m, 1)
-      dir = dir + 1
-    end
-  end
-  return m
-end
-
-function concatenate_table(t)
-  local x = ''
-  local i
-  for i = 1, #t do
-    if t[i] ~= nil then
-      local y = t[i]
-      x = x .. y
-    end
-  end
-  return x
-end
-
-local function table_index(t)
-  local index = {}
-  for k, v in pairs(t) do
-    index[v] = k
-  end
-  return index[1]
-end
-
-local function first_index(t)
-  local iter
-  for iter = 1, #t do
-    if t[iter] == 1 then
-      return iter
-    end
-  end
-end
-
-local function make_nil(t, ind)
-  local iter
-  if ind > 1 then
-    for iter = 1, ind - 1 do
-      t[iter] = nil
-    end
-  else
-    for iter = 1, #t do
-      t[iter] = nil
-    end
-  end
-  decimal_value = 0
-  calc_binary_input()
-  return t
-end
-
-local function tally(t)
-  local freq = 0
-  local iter
-  for iter = 1, #t do
-    if t[iter] == 1 then
-      freq = freq + 1
-    end
-  end
-  return freq
-end
-
-function check_nil(t)
-  local iter
-  for iter = 1, #t do
-    if t[iter] ~= nil then
-      return false
-    end
-  end
-  return true
-end
-
 -- GRID FUNCTIONS
 
 function grid_redraw()
@@ -640,6 +646,8 @@ function grid_redraw()
   else
     g:led(11, 8, 15)
   end
+  g:led(11, 7, 3)
+  g:led(11, 6, 3)
 
   -- 4x4 location
   local tr
@@ -752,15 +760,51 @@ g.key = function(x, y, z)
   if x == 11 and y == 8 then
     if z == 1 then
       delay = 1
-      params:set('delay', 0.7)
+      params:set('delay', 1)
       params:set('delay_time', (math.random(100)) / 100)
       params:set('delay_feedback', (math.random(100)) / 100)
     else
       delay = 0
-      params:set('delay', 0)
     end
     grid_redraw()
     redraw()
+  end
+
+  if x == 11 and y == 6 then
+    audio.level_eng_cut(z)
+  end
+
+  if x == 11 and y == 7 and z == 1 then
+    delay = 0
+    params:set('delay', 0)
+    grid_redraw()
+    redraw()
+  end
+
+  -- reverb
+  if x == 3 and y < 5 then
+    engine.reverbSend(y, 1)
+  end
+  if x == 12 and y == 8 then
+    if z == 1 then
+      reverb = 1
+    else
+      reverb = 0
+    end
+    grid_redraw()
+    redraw()
+  end
+  if x == 12 and z == 1 then
+    if y == 8 then -- short spaces
+      engine.reverbRoom(math.random(25) / 100)
+      engine.reverbDamp(math.random(75, 100) / 100)
+    elseif y == 7 then -- mid spaces
+      engine.reverbRoom(math.random(25, 75) / 100)
+      engine.reverbDamp(math.random(40, 80) / 100)
+    elseif y == 6 then -- long spaces
+      engine.reverbRoom(math.random(75, 100) / 100)
+      engine.reverbDamp(math.random(30, 80) / 100)
+    end
   end
 
   -- turn to nil a binary bit
@@ -994,4 +1038,36 @@ end
 
 function cleanup()
   clk:stop()
+end
+
+function init()
+  -- clock setup
+  clk.on_step = count
+  clk.on_select_internal = function()
+    clk:start()
+    external = false
+  end
+
+  clk.on_select_external = reset_pattern
+  external = false
+
+  -- params
+  clk:add_clock_params()
+  params:add_separator()
+  for channel = 1, 4 do
+    ack.add_channel_params(channel)
+  end
+  ack.add_effects_params()
+
+  for i = 1, 4 do
+    sequences[i] = generate_sequence(track)
+    track = track + 1
+  end
+  track = 1
+
+  -- hs
+  delay = 0
+  hs.init()
+  params:set('delay', delay)
+  grid_redraw()
 end
