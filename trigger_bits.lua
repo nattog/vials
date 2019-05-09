@@ -110,7 +110,7 @@ local probs = {100, 100, 100, 100}
 local mutes = {0, 0, 0, 0}
 local rotations = {0, 0, 0, 0}
 local track_divs = {1, 1, 1, 1}
-local div_options = {'1', '1/2', '1/3', '1/4', '1/6', '1/8', '1/12', '1/16', '1/24', '1/32', '1/48', '1/64'}
+local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 local sequences = {}
 local steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 
@@ -146,8 +146,8 @@ local function split(s, delimiter)
 end
 
 local function clock_divider(track)
-  div = split(div_options[track_divs[track]], '/')
-  return tonumber(div[#div])
+  div = div_options[track_divs[track]]
+  return div
 end
 
 local function rotate(m, dir)
@@ -173,7 +173,7 @@ function count()
   grid_redraw()
 
   for t = 1, 4 do
-    if meta_position % clock_divider(t) == 0 then
+    if (meta_position % clock_divider(t) == 1) or (clock_divider(t) == 1) then
       -- wrap sequence
       if positions[t] >= #sequences[t] then
         positions[t] = 0
@@ -570,8 +570,8 @@ function enc(n, d)
       if div_amt <= #div_options then
         if div_amt == 1 and d == -1 then
           track_divs[track] = 1
-        elseif div_amt == 12 and d == 1 then
-          track_divs[track] = 12
+        elseif div_amt == 8 and d == 1 then
+          track_divs[track] = 8
         else
           track_divs[track] = div_amt + d
         end
