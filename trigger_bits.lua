@@ -114,6 +114,9 @@ local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 local sequences = {}
 local steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 
+local delay = 0
+local delay_in = 1
+
 local function start()
   playing = true
   clk:start()
@@ -646,8 +649,21 @@ function grid_redraw()
   else
     g:led(11, 8, 15)
   end
+  if delay_in == 1 then
+    g:led(10, 8, 15)
+  else
+    g:led(10, 8, 3)
+  end
+  g:led(12, 8, 3)
+
+  -- reverb
+  g:led(10, 7, 3)
   g:led(11, 7, 3)
-  g:led(11, 6, 3)
+  g:led(12, 7, 3)
+  local inrev
+  for inrev = 1, 4 do
+    g:led(3, inrev, 3)
+  end
 
   -- 4x4 location
   local tr
@@ -770,11 +786,17 @@ g.key = function(x, y, z)
     redraw()
   end
 
-  if x == 11 and y == 6 then
-    audio.level_eng_cut(z)
+  if x == 10 and y == 8 and z == 1 then
+    if delay_in == 1 then
+      audio.level_eng_cut(0)
+      delay_in = 0
+    else
+      delay_in = z
+      audio.level_eng_cut(z)
+    end
   end
 
-  if x == 11 and y == 7 and z == 1 then
+  if x == 12 and y == 8 and z == 1 then
     delay = 0
     params:set('delay', 0)
     grid_redraw()
@@ -782,26 +804,26 @@ g.key = function(x, y, z)
   end
 
   -- reverb
-  if x == 3 and y < 5 then
-    engine.reverbSend(y, 1)
-  end
-  if x == 12 and y == 8 then
-    if z == 1 then
-      reverb = 1
-    else
-      reverb = 0
-    end
-    grid_redraw()
-    redraw()
-  end
-  if x == 12 and z == 1 then
-    if y == 8 then -- short spaces
+  -- if x == 3 and y < 5 then
+  --   engine.reverbSend(y, 1)
+  -- end
+  -- if x == 12 and y == 8 then
+  --   if z == 1 then
+  --     reverb = 1
+  --   else
+  --     reverb = 0
+  --   end
+  --   grid_redraw()
+  --   redraw()
+  -- end
+  if y == 7 and z == 1 then
+    if x == 10 then -- short spaces
       engine.reverbRoom(math.random(25) / 100)
       engine.reverbDamp(math.random(75, 100) / 100)
-    elseif y == 7 then -- mid spaces
+    elseif x == 11 then -- mid spaces
       engine.reverbRoom(math.random(25, 75) / 100)
       engine.reverbDamp(math.random(40, 80) / 100)
-    elseif y == 6 then -- long spaces
+    elseif x == 12 then -- long spaces
       engine.reverbRoom(math.random(75, 100) / 100)
       engine.reverbDamp(math.random(30, 80) / 100)
     end
@@ -1066,7 +1088,6 @@ function init()
   track = 1
 
   -- hs
-  delay = 0
   hs.init()
   params:set('delay', delay)
   grid_redraw()
