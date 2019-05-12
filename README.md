@@ -68,6 +68,3 @@ using grid greatly expands the performability of vials. it allows for looping, c
     - kill echo
 * **Q** - binary input, tap for 1, tap twice for 0
 * **R** - trim binary sequence at index
-
-## saving/ loading your work
-to save your loaded samples and their settings, navigate to the PARAMETERS page and hold Norns Key1. turn Enc2 to select save, and Enc3 to scroll through available save slots. use Key3 to save your data to the slot.
