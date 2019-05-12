@@ -34,7 +34,7 @@ each track is configured to send midi and trigger a sample. please see the PARAM
 
 using grid greatly expands the performability of vials. it allows for looping, changing sequence values in both binary and decimals, alongside some performance controls such as sample triggers, mutes, reverb and delay controls and randomisation. reverb and delay effects have their own view, found by holding the reverb and delay view keys which then allow for fx control with the norns encoders.
 
-![alt text](grid_interface.jpg "grid interface")
+![alt text](assets/grid_interface.jpg "grid interface")
 * **A** - trigger samples
 * **B** - mute track
 * **C** - track reverb send switch (-60.0db : 0db)

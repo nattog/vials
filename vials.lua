@@ -33,17 +33,18 @@
 --
 -- sample triggers
 -- track mutes
+-- reverb sends (y5 kill all)
 --
 -- 4x4 segment looper
--- with additional nav support
+-- nav to left and below
 --
--- phone pad style decimal input
+-- phone pad decimal input
 --
 -- track and segment navigation
--- centre button holds numbers
+-- hold centre after first entry
 -- from phone pad for XX, XXX
 --
--- rotate sequence >> or <<
+-- rotate sequence left or right
 --
 -- reset all tracks to 0
 -- play/stop
@@ -70,8 +71,8 @@
 -- row below makes nil
 -- whats above
 --
--- bug reports to @nattog
--- thanks!
+-- report any bug to
+-- @nattog on lines
 --
 
 engine.name = "Ack"
