@@ -49,7 +49,7 @@ using grid greatly expands the performability of dizzy. it allows for looping, c
 * **L** - rotate forward or backwards track sequence
 * **M** - reset all sequences to start
 * **N** - start / stop
-* **O** - reverb
+* **O** - reverb controls left to right
     - reverb level switch (-60.0db : 0db)
     - random short reverb
     - random mid reverb
@@ -58,7 +58,7 @@ using grid greatly expands the performability of dizzy. it allows for looping, c
       - enc 1 - reverb level
       - enc 2 - reverb room size
       - enc 3 - reverb damp
-* **P** - echo (halfsecond)
+* **P** - echo controls left to right
     - echo send mute
     - echo edit view
       - enc 1 - echo level
