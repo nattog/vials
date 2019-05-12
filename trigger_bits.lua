@@ -134,6 +134,7 @@ local reverb_view = 0
 
 local function start()
   playing = true
+  just_started = true
   clk:start()
 end
 
@@ -165,6 +166,7 @@ end
 
 local function reset_positions()
   meta_position = 0
+  just_started = true
   positions = {0, 0, 0, 0}
   note_off()
 end
@@ -204,9 +206,13 @@ function count()
   meta_position = (meta_position % 16) + 1
   grid_redraw()
   note_off()
-
+  local divs = {}
   for t = 1, 4 do
-    if (meta_position % clock_divider(t) == 1) or (clock_divider(t) == 1) then
+    divs[t] = clock_divider(t)
+  end
+  for t = 1, 4 do
+    local counter = meta_position % divs[t]
+    if (counter > 0 and just_started == true) or counter == 0 then
       -- wrap sequence
       if positions[t] >= #sequences[t] then
         positions[t] = 0
@@ -224,7 +230,6 @@ function count()
           end
         end
       end
-    else
       if params:get("send_midi") == 1 then
         m:note_off(params:get(t .. ":_midi_note"), 100, params:get("midi_chan"))
       end
@@ -233,6 +238,7 @@ function count()
   if delay_view < 1 then
     redraw()
   end
+  just_started = false
 end
 
 local function dec_to_bin(num)
@@ -1163,7 +1169,7 @@ function init()
   -- params
   clk:add_clock_params()
   params:add_number("midi_chan", "midi chan", 1, 16, 1)
-  params:add_option("send_midi", ": send midi", {"no", "yes"}, 1)
+  params:add_option("send_midi", "send midi", {"no", "yes"}, 1)
 
   params:add_separator()
   for channel = 1, 4 do
