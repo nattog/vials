@@ -1,4 +1,4 @@
-# dizzy
+# vials
 
 ## a binary rhythmbox
 
@@ -32,7 +32,7 @@ each track is configured to send midi and trigger a sample. please see the PARAM
 
 ## grid
 
-using grid greatly expands the performability of dizzy. it allows for looping, changing sequence values in both binary and decimals, alongside some performance controls such as sample triggers, mutes, reverb and delay controls and randomisation. reverb and delay effects have their own view, found by holding the reverb and delay view keys which then allow for fx control with the norns encoders.
+using grid greatly expands the performability of vials. it allows for looping, changing sequence values in both binary and decimals, alongside some performance controls such as sample triggers, mutes, reverb and delay controls and randomisation. reverb and delay effects have their own view, found by holding the reverb and delay view keys which then allow for fx control with the norns encoders.
 
 ![alt text](grid_interface.jpg "grid interface")
 * **A** - trigger samples
