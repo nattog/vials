@@ -5,7 +5,7 @@ a binary rhythmbox
 each track features 4 slots containing decimal values between 0 and 255. a decimal is converted to its binary representation and played in a sequence of binary where 1 sends a trigger and 0 denotes a break. a track can be muted, has its own probability and divisions, each sequence can be rotated along its binary string. the sequencer is enhanced for performance using a grid, can be externally clocked and sends midi notes.
 
 
-home
+##home
 
 the first view is the main interface
 on this page
@@ -30,9 +30,12 @@ on this page
 
 each track is configured to send midi and trigger a sample. please see the PARAMETERS menu for configuration.
 
-grid
+##grid
 
 using grid greatly expands the performability of dizzy. it allows for looping, changing sequence values in both binary and decimals, alongside some performance controls such as sample triggers, mutes, reverb and delay controls and randomisation. reverb and delay effects have their own view, found by holding the reverb and delay view keys which then allow for fx control with the norns encoders.
+
+![alt text](grid_interface.jpg "grid interface")
+
 
 A - trigger samples
 B - mute track
@@ -70,5 +73,5 @@ R - trim binary sequence at index
 
 
 
-saving/ loading your work
+##saving/ loading your work
 to save your loaded samples and their settings, navigate to the PARAMETERS page and hold Norns Key1. turn Enc2 to select save, and Enc3 to scroll through available save slots. use Key3 to save your data to the slot.
