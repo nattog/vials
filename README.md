@@ -68,3 +68,10 @@ using grid greatly expands the performability of vials. it allows for looping, c
     - kill echo
 * **Q** - binary input, tap for 1, tap twice for 0
 * **R** - trim binary sequence at index
+
+## saving / loading
+vials saves the sequence data each time the sequencer is stopped. on selecting vials, it automatically loads where you left off. 
+
+## vague ideas for the future
+grid view for saving/loading patterns / psets
+add new sequencer directions
