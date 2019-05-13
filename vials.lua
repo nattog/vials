@@ -71,8 +71,8 @@
 -- row below makes nil
 -- whats above
 --
--- report any bug to
--- @nattog on lines
+-- bug reports to @nattog
+-- thanks!
 --
 
 engine.name = "Ack"
@@ -155,6 +155,7 @@ local function stop()
   note_off()
   meta_position = 0
   print("stop")
+  vials_save()
 end
 
 local function reset_pattern()
@@ -330,6 +331,8 @@ function change_decimal(d)
   steps[track][selected + 1] = decimal_value
   if loop[track] == 0 then
     sequences[track] = generate_sequence(track)
+  elseif loop[track] == selected + 1 then
+    loop_on(track)
   end
   calc_binary_input()
   grid_redraw()
@@ -1153,7 +1156,56 @@ end
 
 function cleanup()
   clk:stop()
+  vials_save()
   note_off()
+end
+
+-- -----------------------------
+-- save the set data to storage.
+-- -----------------------------
+function vials_save()
+  local file = io.open(_path.data .. "vials.data", "w+")
+  io.output(file)
+  io.write("v1" .. "\n")
+  for x = 1, 4 do
+    for y = 1, 4 do
+      io.write(steps[x][y] .. "\n")
+    end
+  end
+  for z = 1, 4 do
+    io.write(rotations[z] .. "\n")
+    io.write(track_divs[z] .. "\n")
+    io.write(probs[z] .. "\n")
+  end
+  io.write()
+  io.close(file)
+end
+
+-- -------------------------------
+-- load the set data from storage.
+-- -------------------------------
+function vials_load()
+  local file = io.open(_path.data .. "vials.data", "r")
+
+  if file then
+    print("datafile found")
+    io.input(file)
+    if io.read() == "v1" then
+      for x = 1, 4 do
+        for y = 1, 4 do
+          steps[x][y] = tonumber(io.read()) or 0
+        end
+      end
+      for z = 1, 4 do
+        rotations[z] = tonumber(io.read()) or 0
+        track_divs[z] = tonumber(io.read()) or 1
+        probs[z] = tonumber(io.read()) or 100
+      end
+    else
+      print("invalid data file")
+    end
+    io.close(file)
+  end
 end
 
 function init()
@@ -1190,5 +1242,12 @@ function init()
   -- hs
   hs.init()
   params:set("delay", delay_view)
+
+  vials_load()
+  local init_t
+  for init_t = 1, 4 do
+    sequences[init_t] = generate_sequence(init_t)
+  end
+  change_focus()
   grid_redraw()
 end
