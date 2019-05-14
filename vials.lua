@@ -89,9 +89,6 @@ local m = midi.connect()
 m.event = function(data)
   clk:process_midi(data)
 end
-
-local automatic = 0
-
 -- screen values
 local color = 3
 local value_color = color + 5
@@ -548,13 +545,10 @@ end
 
 function key(n, z)
   --key 1 === START/STOP
-  if n == 1 and z == 1 and not key3_hold then
-    automatic = automatic + 1
-    if automatic % 2 == 1 then
+  if n == 1 and z == 1 then
+    key1_hold = true
+    if not playing then
       start()
-      key1_hold = true
-    elseif automatic % 2 == 0 then
-      key1_hold = true
     end
   end
 
@@ -842,7 +836,6 @@ g.key = function(x, y, z)
 
   -- start/stop
   if x == 16 and y == 8 and z == 1 then
-    automatic = automatic + 1
     if not playing then
       start()
     else
