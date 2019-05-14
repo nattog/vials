@@ -186,7 +186,7 @@ local function clock_divider(track)
   return div
 end
 
-function rotate(m, dir)
+local function rotate(m, dir)
   if dir > 0 then
     while dir ~= 0 do
       table.insert(m, 1, m[#m])
