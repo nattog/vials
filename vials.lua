@@ -128,10 +128,10 @@ local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 sequences = {}
 local steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 
-local delay_view = 0
-local delay_in = 1
+local delay_view = false
+local delay_in = true
 
-local reverb_view = 0
+local reverb_view = false
 
 local function start()
   playing = true
@@ -214,7 +214,7 @@ function count()
   end
   for t = 1, 4 do
     local counter = meta_position % divs[t]
-    if (counter > 0 and just_started == true) or counter == 0 then
+    if (counter > 0 and just_started) or counter == 0 then
       -- wrap sequence
       if positions[t] >= #sequences[t] then
         positions[t] = 0
@@ -237,7 +237,7 @@ function count()
       end
     end
   end
-  if delay_view < 1 then
+  if not delay_view then
     redraw()
   end
   just_started = false
@@ -434,7 +434,7 @@ local function position_vis()
 end
 
 function redraw()
-  if delay_view == 0 and reverb_view == 0 then
+  if not delay_view and not reverb_view then
     screen.clear()
     screen.level(color)
     screen.font_face(word_font)
@@ -518,7 +518,7 @@ function redraw()
     screen.font_face(number_font)
     screen.text(dec_to_bin(decimal_value))
     screen.update()
-  elseif delay_view == 1 then
+  elseif delay_view then
     screen.clear()
     screen_x = (15 * params:get("delay_rate"))
     screen_y = 10
@@ -536,7 +536,7 @@ function redraw()
       end
     end
     screen.update()
-  elseif reverb_view == 1 then
+  elseif reverb_view then
     screen.clear()
     screen.line_width(2)
     screen.level(15 - (math.ceil(params:get("reverb_damp") * 15)))
@@ -548,7 +548,7 @@ end
 
 function key(n, z)
   --key 1 === START/STOP
-  if n == 1 and z == 1 and key3_hold == false then
+  if n == 1 and z == 1 and not key3_hold then
     automatic = automatic + 1
     if automatic % 2 == 1 then
       start()
@@ -563,19 +563,19 @@ function key(n, z)
   end
 
   -- reset
-  if n == 3 and z == 1 and key1_hold == true then
+  if n == 3 and z == 1 and key1_hold then
     reset_positions()
   end
 
   -- stop
 
-  if n == 2 and z == 1 and key1_hold == true then
+  if n == 2 and z == 1 and key1_hold then
     stop()
     reset_positions()
   end
 
   --key 2 CHANGE SLOT
-  if n == 2 and z == 1 and key1_hold == false and key3_hold == false then
+  if n == 2 and z == 1 and not key1_hold and not key3_hold then
     key2_hold = true
     change_selected(z)
   elseif n == 2 and z == 0 then
@@ -590,7 +590,7 @@ function key(n, z)
   end
 
   -- ROTATE
-  if n == 2 and z == 1 and key3_hold == true then
+  if n == 2 and z == 1 and key3_hold then
     rotations[track] = rotations[track] + 1
     if loop[track] > 0 then
       if rotations[track] >= #dec_to_bin(steps[track][loop[track]]) then
@@ -605,12 +605,12 @@ function key(n, z)
   end
 
   -- RESET
-  if n == 3 and z == 1 and key2_hold == false then
+  if n == 3 and z == 1 and not key2_hold then
     key3_hold = true
   end
 
   -- MUTE TRACK
-  if n == 3 and z == 1 and key2_hold == true then
+  if n == 3 and z == 1 and key2_hold then
     if mutes[track] == 0 then
       mutes[track] = 1
     elseif mutes[track] == 1 then
@@ -622,9 +622,9 @@ function key(n, z)
 end
 
 function enc(n, d)
-  if delay_view == 0 and reverb_view == 0 then
+  if not delay_view and not reverb_view then
     -- change track
-    if n == 2 and key3_hold == false then
+    if n == 2 and not key3_hold then
       track = track + d
       if track == 0 then
         track = 4
@@ -637,9 +637,9 @@ function enc(n, d)
 
     -- change decimal
     if n == 3 then
-      if key3_hold == false then
+      if not key3_hold then
         change_decimal(d)
-      elseif key3_hold == true then
+      elseif key3_hold then
         probs[track] = (probs[track] + d) % 101
       end
     end
@@ -649,7 +649,7 @@ function enc(n, d)
       params:delta("bpm", d)
     end
 
-    if n == 2 and key3_hold == true then
+    if n == 2 and key3_hold then
       local div_amt = track_divs[track]
       if div_amt <= #div_options then
         if div_amt == 1 and d == -1 then
@@ -663,7 +663,7 @@ function enc(n, d)
     end
     redraw()
     grid_redraw()
-  elseif delay_view == 1 then
+  elseif delay_view then
     if n == 1 then
       params:delta("delay", d)
     elseif n == 2 then
@@ -672,7 +672,7 @@ function enc(n, d)
       params:delta("delay_feedback", d)
     end
     redraw()
-  elseif reverb_view == 1 then
+  elseif reverb_view then
     if n == 1 then
       params:delta("reverb_level", d)
     elseif n == 2 then
@@ -717,7 +717,7 @@ function grid_redraw()
   else
     g:led(16, 8, 5)
   end
-  if playing == false then
+  if not playing then
     g:led(16, 8, 3)
   end
 
@@ -735,12 +735,12 @@ function grid_redraw()
   end
 
   -- delay
-  if delay_view == 0 then
+  if not delay_view then
     g:led(11, 8, 3)
   else
     g:led(11, 8, 15)
   end
-  if delay_in == 1 then
+  if delay_in then
     g:led(10, 8, 15)
   else
     g:led(10, 8, 3)
@@ -812,9 +812,9 @@ function grid_redraw()
   end
 
   -- calc_hold
-  if calc_hold == true then
+  if calc_hold then
     g:led(15, 2, 15)
-  elseif calc_hold == false then
+  elseif not calc_hold then
     g:led(15, 2, 3)
   end
   g:refresh()
@@ -843,7 +843,7 @@ g.key = function(x, y, z)
   -- start/stop
   if x == 16 and y == 8 and z == 1 then
     automatic = automatic + 1
-    if playing == false then
+    if not playing then
       start()
     else
       stop()
@@ -884,21 +884,21 @@ g.key = function(x, y, z)
   -- delay
   if x == 11 and y == 8 then
     if z == 1 then
-      delay_view = 1
+      delay_view = true
       params:set("delay", 1)
     else
-      delay_view = 0
+      delay_view = false
     end
     grid_redraw()
     redraw()
   end
 
   if x == 10 and y == 8 and z == 1 then
-    if delay_in == 1 then
+    if delay_in then
       audio.level_eng_cut(0)
-      delay_in = 0
+      delay_in = false
     else
-      delay_in = z
+      delay_in = true
       audio.level_eng_cut(z)
     end
   end
@@ -909,7 +909,7 @@ g.key = function(x, y, z)
   end
 
   if x == 13 and y == 8 and z == 1 then
-    delay_view = 0
+    delay_view = false
     params:set("delay", 0)
     grid_redraw()
     redraw()
@@ -949,10 +949,10 @@ g.key = function(x, y, z)
   end
   if x == 14 and y == 7 then
     if z == 1 then -- reverbView
-      reverb_view = 1
+      reverb_view = true
       redraw()
     else
-      reverb_view = 0
+      reverb_view = false
     end
   end
 
@@ -981,7 +981,7 @@ g.key = function(x, y, z)
   -- binary input
   if x <= 8 and y == 7 and z == 1 then
     -- if array of nil
-    if check_nil(binary_input) == true then
+    if check_nil(binary_input) then
       binary_input[x] = 1
       for bina = x + 1, #binary_input do
         binary_input[bina] = 0
@@ -1068,10 +1068,10 @@ g.key = function(x, y, z)
   end
 
   -- calculator misc
-  if x == 15 and y == 2 then
-    if z == 1 and calc_hold == false then
+  if x == 15 and y == 2 and z == 1 then
+    if not calc_hold then
       calc_hold = true
-    elseif z == 1 and calc_hold == true then
+    elseif calc_hold then
       calc_hold = false
     end
     g:refresh()
@@ -1080,7 +1080,7 @@ g.key = function(x, y, z)
   -- calculator
   if z == 1 and x >= 10 and x < 13 and y <= 4 then
     local y_reducer = calculate_minus(y)
-    if calc_hold == false then
+    if not calc_hold then
       calc_input = {}
       final_input = ""
       if y == 4 then
@@ -1088,7 +1088,7 @@ g.key = function(x, y, z)
       else
         calc_input[1] = x - y_reducer
       end
-    elseif calc_hold == true then
+    elseif calc_hold then
       if y == 4 then
         calc_input[#calc_input + 1] = 0
       else
@@ -1241,7 +1241,7 @@ function init()
 
   -- hs
   hs.init()
-  params:set("delay", delay_view)
+  params:set("delay", 0)
 
   vials_load()
   local init_t
