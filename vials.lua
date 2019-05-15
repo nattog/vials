@@ -77,18 +77,17 @@
 
 engine.name = "Ack"
 
-ack = require "ack/lib/ack"
+local ack = require "ack/lib/ack"
 local BeatClock = require "beatclock"
 local ControlSpec = require "controlspec"
-hs = include "awake/lib/halfsecond"
+local hs = include "awake/lib/halfsecond"
 
 local g = grid.connect()
 
+local external = false
 local clk = BeatClock.new()
 local m = midi.connect()
-m.event = function(data)
-  clk:process_midi(data)
-end
+
 -- screen values
 local color = 3
 local value_color = color + 5
@@ -110,7 +109,7 @@ local loop = {0, 0, 0, 0}
 -- sequence vars
 local selected = 0
 local decimal_value = 0
-track = 1
+local track = 1
 local bpm = 120
 
 local playing = false
@@ -122,7 +121,7 @@ local mutes = {0, 0, 0, 0}
 local rotations = {0, 0, 0, 0}
 local track_divs = {1, 1, 1, 1}
 local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
-sequences = {}
+local sequences = {}
 local steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 
 local delay_view = false
@@ -145,12 +144,17 @@ local function note_off()
   end
 end
 
+local function reset_positions()
+  meta_position = 0
+  just_started = true
+  positions = {0, 0, 0, 0}
+  note_off()
+end
+
 local function stop()
   clk:stop()
   playing = false
-  local i
-  note_off()
-  meta_position = 0
+  reset_positions()
   print("stop")
   vials_save()
 end
@@ -163,11 +167,11 @@ local function reset_pattern()
   note_off()
 end
 
-local function reset_positions()
-  meta_position = 0
-  just_started = true
-  positions = {0, 0, 0, 0}
-  note_off()
+m.event = function(data)
+  clk:process_midi(data)
+  if data[1] == 252 and external then
+    stop()
+  end
 end
 
 local function split(s, delimiter)
@@ -201,6 +205,7 @@ local function rotate(m, dir)
 end
 
 function count()
+  local midi_send = (params:get("send_midi") == 1)
   local t
   meta_position = (meta_position % 16) + 1
   grid_redraw()
@@ -224,12 +229,12 @@ function count()
       if sequences[t][positions[t]] == 1 then
         if math.random(100) <= probs[t] and mutes[t] == 0 then
           engine.trig(t - 1)
-          if params:get("send_midi") == 1 then
+          if midi_send then
             m:note_on(params:get(t .. ":_midi_note"), 100, params:get("midi_chan"))
           end
         end
       end
-      if params:get("send_midi") == 1 then
+      if midi_send then
         m:note_off(params:get(t .. ":_midi_note"), 100, params:get("midi_chan"))
       end
     end
@@ -1215,7 +1220,7 @@ function init()
   -- params
   clk:add_clock_params()
   params:add_number("midi_chan", "midi chan", 1, 16, 1)
-  params:add_option("send_midi", "send midi", {"no", "yes"}, 1)
+  params:add_option("send_midi", "send midi", {"yes", "no"}, 1)
 
   params:add_separator()
   for channel = 1, 4 do
