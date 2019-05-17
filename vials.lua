@@ -2,12 +2,10 @@
 -- a binary rhythmbox
 -- v1.0 @nattog
 --
---
 -- - - - - - - - - - - - - - - - -
 -- 4x4 slots of decimals
 --
 -- represented binary
---
 -- concatenated into sequences
 --
 -- - - - - - - - - - - - - - - - -
@@ -111,7 +109,6 @@ local selected = 0
 local decimal_value = 0
 local track = 1
 local bpm = 120
-
 local playing = false
 local reset = false
 local positions = {0, 0, 0, 0}
@@ -126,7 +123,6 @@ local steps = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
 
 local delay_view = false
 local delay_in = true
-
 local reverb_view = false
 
 local function start()
@@ -221,10 +217,8 @@ function count()
       if positions[t] >= #sequences[t] then
         positions[t] = 0
       end
-
       -- change position
       positions[t] = (positions[t] + 1)
-
       -- trigger note
       if sequences[t][positions[t]] == 1 then
         if math.random(100) <= probs[t] and mutes[t] == 0 then
@@ -413,9 +407,7 @@ local function position_vis()
   else
     phrase = binary_string(track)
   end
-
-  -- rotate!!
-  local temp = {}
+  local temp = {} -- rotate!!
   phrase:gsub(
     ".",
     function(c)
@@ -424,8 +416,6 @@ local function position_vis()
   )
   phrase_rotated = rotate(temp, rotations[track])
   phrase = concatenate_table(phrase_rotated)
-
-  --
   if positions[track] > 0 then
     screen.text(string.sub(phrase, 1, positions[track] - 1))
   end
@@ -451,7 +441,6 @@ function redraw()
       screen.font_face(number_font)
       screen.text(params:get("bpm"))
     end
-
     screen.move(80, 10)
     screen.level(color)
     screen.font_face(word_font)
@@ -556,23 +545,18 @@ function key(n, z)
       start()
     end
   end
-
   if n == 1 and z == 0 then
     key1_hold = false
   end
-
   -- reset
   if n == 3 and z == 1 and key1_hold then
     reset_positions()
   end
-
   -- stop
-
   if n == 2 and z == 1 and key1_hold then
     stop()
     reset_positions()
   end
-
   --key 2 CHANGE SLOT
   if n == 2 and z == 1 and not key1_hold and not key3_hold then
     key2_hold = true
@@ -580,14 +564,12 @@ function key(n, z)
   elseif n == 2 and z == 0 then
     key2_hold = false
   end
-
   --key 3 ALT MODE
   if n == 3 and z == 1 then
     key3_hold = true
   elseif n == 3 and z == 0 then
     key3_hold = false
   end
-
   -- ROTATE
   if n == 2 and z == 1 and key3_hold then
     rotations[track] = rotations[track] + 1
@@ -602,12 +584,10 @@ function key(n, z)
     end
     sequences[track] = generate_sequence(track)
   end
-
   -- RESET
   if n == 3 and z == 1 and not key2_hold then
     key3_hold = true
   end
-
   -- MUTE TRACK
   if n == 3 and z == 1 and key2_hold then
     if mutes[track] == 0 then
@@ -616,7 +596,6 @@ function key(n, z)
       mutes[track] = 0
     end
   end
-
   redraw()
 end
 
@@ -633,7 +612,6 @@ function enc(n, d)
       end
       change_focus()
     end
-
     -- change decimal
     if n == 3 then
       if not key3_hold then
@@ -642,12 +620,10 @@ function enc(n, d)
         probs[track] = (probs[track] + d) % 101
       end
     end
-
     -- change bpm
     if n == 1 then
       params:delta("bpm", d)
     end
-
     if n == 2 and key3_hold then
       local div_amt = track_divs[track]
       if div_amt <= #div_options then
@@ -684,7 +660,6 @@ function enc(n, d)
 end
 
 -- GRID FUNCTIONS
-
 function grid_redraw()
   if g == nil then
     return
