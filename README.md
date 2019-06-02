@@ -17,8 +17,8 @@ on this page
 - KEY 1 takes you to PARAMS
 - Hold KEY 1 to start the sequencer
 - While playing, hold KEY 1 for SEQ ALT
-- SEQ ALT + KEY 2 stops the sequence
-- SEQ ALT + KEY 3 resets the sequence
+- SEQ ALT + KEY 2 resets the sequence
+- SEQ ALT + KEY 3 stops the sequence
 
 - KEY 2 changes slot on selected track
 - KEY 2 + KEY 3 mutes the track
@@ -42,12 +42,12 @@ using grid greatly expands the performability of vials. it allows for looping, c
 * **E** - change track
 * **F** - change selected slot
 * **G** - loop slot
-* **H** - decimal number pad to input decimals
-* **I** - hold to add more decimals to same slot (ie, 2 to 1 = 12)
-* **J** - change tracks
-* **K** - change selected slot
+* **H** - param view
+* **I** - decimal number pad to input decimals
+* **J** - hold to add more decimals to same slot (ie, 2 to 1 = 12)
+* **K** - shift track sequences
 * **L** - rotate forward or backwards track sequence
-* **M** - reset all sequences to start
+* **M** - reset all sequences to start position
 * **N** - start / stop
 * **O** - reverb controls left to right
     - reverb level switch (-60.0db : 0db)
