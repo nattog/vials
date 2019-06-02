@@ -1,4 +1,4 @@
-# vials (readme needs updating)
+# vials
 
 ## a binary rhythmbox
 
