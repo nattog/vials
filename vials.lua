@@ -92,18 +92,23 @@ local rotate_dirty = false
 local binary_input = {nil, nil, nil, nil, nil, nil, nil}
 local vials = {} -- sequence vars
 local note_off_queue = {34, 35, 36, 37}
-for v = 1, 4 do
-  vials[v] = {
-    pos = 0,
-    prob = 100,
-    mute = 0,
-    seq = {0},
-    steps = {0, 0, 0, 0},
-    rotations = 0,
-    division = 1,
-    loop = 0
-  }
+local global_v = {}
+for j = 1, 15 do
+  vi[j] = {}
+  for v = 1, 4 do
+    vi[j][v] = {
+      pos = 0,
+      prob = 100,
+      mute = 0,
+      seq = {0},
+      steps = {0, 0, 0, 0},
+      rotations = 0,
+      division = 1,
+      loop = 0
+    }
+  end
 end
+local current_vials = 1
 local selected = 0
 local decimal_value = 0
 local track = 1
@@ -1135,6 +1140,7 @@ function init()
   hs.init() -- halfsecond
   params:set("delay", 0)
   vials_load()
+  vials = vi[current_vials]
   local init_t
   for init_t = 1, 4 do
     vials[init_t].seq = generate_sequence(init_t)
