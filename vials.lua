@@ -37,8 +37,6 @@
 -- hold right next to 3
 -- for XX, XXX
 --
--- navigation
---
 -- shift sequences up or down
 -- rotate sequence left or right
 --
@@ -90,6 +88,7 @@ local key2_hold = false
 local key3_hold = false
 local calc_hold = 0
 local calc_input = {}
+local rotate_dirty = false
 local binary_input = {nil, nil, nil, nil, nil, nil, nil}
 local vials = {} -- sequence vars
 local note_off_queue = {34, 35, 36, 37}
@@ -785,14 +784,10 @@ function grid_redraw()
       g:led(vials[y].loop + 4, y, 15)
     end
   end
-  g:led(15, 1, 5) -- navigation
-  g:led(15, 3, 5)
-  g:led(14, 2, 5)
+  g:led(14, 2, 5) -- rotator
   g:led(16, 2, 5)
-  g:led(14, 5, 5) -- rotator
-  g:led(16, 5, 5)
-  g:led(15, 4, 5)
-  g:led(15, 6, 5)
+  g:led(15, 1, 5)
+  g:led(15, 3, 5)
   local u  --  calculator
   for u = 1, 3 do
     for v = 1, 3 do
@@ -989,35 +984,6 @@ g.key = function(x, y, z)
     end
     g:refresh()
   end
-  if z == 1 and x == 15 then -- nav
-    if y == 1 then
-      track = track - z
-      if track == 0 then
-        track = 4
-      end
-    end
-    if y == 3 then
-      track = track + z
-      if track == 5 then
-        track = 1
-      end
-    end
-    change_focus()
-  end
-  if z == 1 and y == 2 then
-    local dirty
-    if x == 14 then
-      selected = (selected - z) % 4
-      dirty = true
-    elseif x == 16 then
-      selected = (selected + z) % 4
-      dirty = true
-    end
-    if dirty then
-      decimal_value = vials[track].steps[selected + 1]
-      binary_input = split_str(dec_to_bin(decimal_value))
-    end
-  end
   if x == 13 and y == 1 and z == 1 then -- calc hold
     calc_hold = 1 - calc_hold
   end
@@ -1058,32 +1024,33 @@ g.key = function(x, y, z)
     end
     calc_binary_input()
   end
-  if z == 1 and y == 5 then -- rotator
-    if x == 14 then
-      vials[track].rotations = vials[track].rotations - 1
-      if vials[track].rotations == -1 then
-        vials[track].rotations = #vials[track].seq - 1
-      end
-      vials[track].seq = generate_sequence(track)
-    elseif x == 16 then
-      vials[track].rotations = vials[track].rotations + 1
-      if vials[track].rotations >= #vials[track].seq then
-        vials[track].rotations = 0
+  if z == 1 and y == 2 then -- rotator
+    if #vials[track].seq > 0 then
+      if x == 14 then
+        vials[track].rotations = vials[track].rotations - 1
+        if vials[track].rotations == -1 then
+          vials[track].rotations = #vials[track].seq - 1
+        end
+      elseif x == 16 then
+        vials[track].rotations = vials[track].rotations + 1
+        if vials[track].rotations >= #vials[track].seq then
+          vials[track].rotations = 0
+        end
       end
       vials[track].seq = generate_sequence(track)
     end
   end
-  if z == 1 and x == 15 and (y == 4 or y == 6) then
+  if z == 1 and x == 15 and (y == 1 or y == 3) then -- track shift
     local iter
-    local shift = y - 5
+    local shift = y - 2
     local rotated_tracks = {}
     local t_rotations = {}
     if shift == 1 then
-      rotated_tracks = {vials[2].steps, vials[3].steps, vials[4].steps, vials[1].steps}
-      t_rotations = {vials[2].rotations, vials[3].rotations, vials[4].rotations, vials[1].rotations}
-    else
       rotated_tracks = {vials[4].steps, vials[1].steps, vials[2].steps, vials[3].steps}
       t_rotations = {vials[4].rotations, vials[1].rotations, vials[2].rotations, vials[3].rotations}
+    else
+      rotated_tracks = {vials[2].steps, vials[3].steps, vials[4].steps, vials[1].steps}
+      t_rotations = {vials[2].rotations, vials[3].rotations, vials[4].rotations, vials[1].rotations}
     end
     for iter = 1, 4 do
       vials[iter].steps = rotated_tracks[iter]
