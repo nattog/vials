@@ -117,6 +117,9 @@ local param_sel = 1
 local delay_view = 0
 local delay_in = 1
 local reverb_view = 0
+local delay_view = false
+local delay_in = true
+local reverb_view = false
 
 local function start()
   playing = true
@@ -237,11 +240,9 @@ function count()
       if vials[t].pos >= #vials[t].seq then
         vials[t].pos = 0
       end
-
       -- change position
       vials[t].pos = (vials[t].pos + 1)
       local pos = vials[t].pos
-
       -- trigger note
       if vials[t].seq[pos] == 1 then
         if math.random(100) <= vials[t].prob and vials[t].mute == 0 then
@@ -433,6 +434,7 @@ local function position_vis()
     phrase = binary_string(track)
   end
   local temp = {} -- rotate
+
   phrase:gsub(
     ".",
     function(c)
