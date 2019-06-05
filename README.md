@@ -83,3 +83,4 @@ note the current pattern must be saved to the session to be recalled.
 ## vague ideas for the future
 * add seq directions
 * swing 
+* accents
