@@ -122,6 +122,10 @@ local delay_view = 0
 local delay_in = 1
 local reverb_view = 0
 local ls_view = 0
+local ceil = math.ceil
+local rand = math.random
+local power = math.pow
+local floor = math.floor
 
 local function deepcopy(orig)
   local orig_type = type(orig)
@@ -218,7 +222,7 @@ local function clock_divider(track)
 end
 
 local function round(what, precision)
-  return math.floor(what * math.pow(10, precision) + 0.5) / math.pow(10, precision)
+  return floor(what * power(10, precision) + 0.5) / power(10, precision)
 end
 
 local function rotate(m, dir)
@@ -237,8 +241,6 @@ local function rotate(m, dir)
   end
   return m
 end
-
-local rand = math.random
 
 function count()
   local midi_send = (params:get("send_midi") == 1)
@@ -274,8 +276,6 @@ function count()
   redraw()
   just_started = false
 end
-
-local power = math.pow
 
 local function dec_to_bin(num)
   local total = 0
@@ -551,7 +551,7 @@ function redraw()
   elseif delay_view > 0 then
     screen_x = (15 * params:get("delay_rate"))
     screen_y = 10
-    screenL = math.ceil(params:get("delay") * 10) + 3
+    screenL = ceil(params:get("delay") * 10) + 3
     for i = 1, (params:get("delay_feedback") * 40) + 1 do
       screen.font_face(11)
       screen.level(screenL)
@@ -567,7 +567,7 @@ function redraw()
     screen.update()
   elseif reverb_view > 0 then
     screen.line_width(2)
-    screen.level(15 - (math.ceil(params:get("reverb_damp") * 15)))
+    screen.level(15 - (ceil(params:get("reverb_damp") * 15)))
     screen.rect(0, 80, params:get("reverb_room_size") * 125, -80 - params:get("reverb_level"))
     screen.fill()
     screen.update()
@@ -595,7 +595,7 @@ function redraw()
       screen.level(color)
     end
     screen.move(60, 40)
-    screen.text("cutoff " .. math.ceil(params:get(param_view .. "_filter_cutoff")))
+    screen.text("cutoff " .. ceil(params:get(param_view .. "_filter_cutoff")))
     screen.move(60, 50)
     screen.text("res " .. round(params:get(param_view .. "_filter_res"), 3))
     screen.move(60, 60)
@@ -951,8 +951,8 @@ g.key = function(x, y, z)
       audio.level_eng_cut(delay_in)
     end
     if x == 12 and y == 8 then
-      params:set("delay_rate", (math.random(200)) / 100)
-      params:set("delay_feedback", (math.random(100)) / 100)
+      params:set("delay_rate", (rand(200)) / 100)
+      params:set("delay_feedback", (rand(100)) / 100)
     end
     if x == 13 and y == 8 then
       delay_view = 0
@@ -979,14 +979,14 @@ g.key = function(x, y, z)
           params:set("reverb_level", -10.0)
         end
       elseif x == 11 then -- short spaces
-        params:set("reverb_room_size", math.random(25) / 100)
-        params:set("reverb_damp", math.random(75, 100) / 100)
+        params:set("reverb_room_size", rand(25) / 100)
+        params:set("reverb_damp", rand(75, 100) / 100)
       elseif x == 12 then -- mid spaces
-        params:set("reverb_room_size", math.random(25, 75) / 100)
-        params:set("reverb_damp", math.random(40, 80) / 100)
+        params:set("reverb_room_size", rand(25, 75) / 100)
+        params:set("reverb_damp", rand(40, 80) / 100)
       elseif x == 13 then -- long spaces
-        params:set("reverb_room_size", math.random(75, 100) / 100)
-        params:set("reverb_damp", math.random(30, 80) / 100)
+        params:set("reverb_room_size", rand(75, 100) / 100)
+        params:set("reverb_damp", rand(30, 80) / 100)
       end
     end
   end
