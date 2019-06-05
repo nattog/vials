@@ -81,5 +81,5 @@ the session is saved to disk when stopped
 note the current pattern must be saved to the session to be recalled.
 
 ## vague ideas for the future
-* grid view for saving/loading patterns / psets
-* add new sequencer directions
+* add seq directions
+* swing 
