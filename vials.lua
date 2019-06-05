@@ -798,7 +798,6 @@ function load_save(x, y)
     current_vials = x
     vials = deepcopy(vi[current_vials])
     print("loaded: " .. x)
-    ls_view = 0
     for i = 1, 4 do
       vials[i].seq = generate_sequence(i)
     end
@@ -806,7 +805,6 @@ function load_save(x, y)
     grid_redraw()
   else -- save
     vi[x] = deepcopy(vials)
-    ls_view = 0
     print("saved: " .. x)
   end
 end
@@ -909,12 +907,15 @@ local function new_pos_selector()
 end
 
 g.key = function(x, y, z)
-  if z == 1 then
-    if ls_view == 1 and x < 16 then
-      load_save(x, y)
-      return
-    end
+  if ls_view == 1 and x < 16 then
+    load_save(x, y)
+    return
+  end
+  if x == 16 and y == 5 then
+    ls_view = 1 - ls_view
+  end
 
+  if z == 1 then
     if x == 2 and y < 5 then -- mute track
       vials[y].mute = 1 - vials[y].mute
     end
