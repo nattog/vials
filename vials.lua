@@ -7,13 +7,9 @@
 -- represented binary
 -- create rhythms
 -- - - - - - - - - - - - - - - - -
--- k1 (hold) start
--- if playing hold k1 for
--- PATTERN ALT
+-- hold k1 to start
 --
--- k2 change position
--- k3 (hold) TRACK ALT
---
+-- k2 change step
 -- e1 change tempo
 -- e2 change track
 -- e3 change decimal
@@ -21,8 +17,9 @@
 -- k1 (hold) + k2 resets
 -- k1 (hold) + k3 stops
 -- k2 (hold) + k3 mute
--- k3 (hold) + k2 rotates binary sequence
--- k3 (hold) + e3 probability
+-- k2 (hold) + k2 rotates binary sequence
+-- k2 (hold) + e3 probability
+-- k3 + e3 loads pattern
 --
 -- GRID (top-left clockwise)
 -- sample triggers
@@ -39,6 +36,8 @@
 --
 -- shift sequences up or down
 -- rotate sequence left or right
+--
+-- hold to load (top) or save (bottom)
 --
 -- seq reset
 -- play/stop
@@ -92,18 +91,23 @@ local rotate_dirty = false
 local binary_input = {nil, nil, nil, nil, nil, nil, nil}
 local vials = {} -- sequence vars
 local note_off_queue = {34, 35, 36, 37}
-for v = 1, 4 do
-  vials[v] = {
-    pos = 0,
-    prob = 100,
-    mute = 0,
-    seq = {0},
-    steps = {0, 0, 0, 0},
-    rotations = 0,
-    division = 1,
-    loop = 0
-  }
+local vi = {}
+for j = 1, 15 do
+  vi[j] = {}
+  for v = 1, 4 do
+    vi[j][v] = {
+      pos = 0,
+      prob = 100,
+      mute = 0,
+      seq = {0},
+      steps = {0, 0, 0, 0},
+      rotations = 0,
+      division = 1,
+      loop = 0
+    }
+  end
 end
+local current_vials = 1
 local selected = 0
 local decimal_value = 0
 local track = 1
@@ -117,9 +121,22 @@ local param_sel = 1
 local delay_view = 0
 local delay_in = 1
 local reverb_view = 0
-local delay_view = false
-local delay_in = true
-local reverb_view = false
+local ls_view = 0
+
+local function deepcopy(orig)
+  local orig_type = type(orig)
+  local copy
+  if orig_type == "table" then
+    copy = {}
+    for orig_key, orig_value in next, orig, nil do
+      copy[deepcopy(orig_key)] = deepcopy(orig_value)
+    end
+    setmetatable(copy, deepcopy(getmetatable(orig)))
+  else -- number, string, boolean, etc
+    copy = orig
+  end
+  return copy
+end
 
 local function start()
   playing = true
@@ -129,7 +146,6 @@ end
 
 local function note_off()
   if params:get("send_midi") == 1 then
-    local i
     for i = 1, #note_off_queue do
       m:note_off(note_off_queue[i])
     end
@@ -139,7 +155,6 @@ end
 local function reset_positions()
   meta_position = 0
   just_started = true
-  local iter
   for iter = 1, 4 do
     vials[iter].pos = 0
   end
@@ -176,7 +191,6 @@ end
 local function reset_pattern()
   clk:reset()
   external = true
-  local iter
   for iter = 1, 4 do
     vials[iter].pos = 0
   end
@@ -224,13 +238,13 @@ local function rotate(m, dir)
   return m
 end
 
+local rand = math.random
+
 function count()
   local midi_send = (params:get("send_midi") == 1)
   meta_position = (meta_position % 16) + 1
   grid_redraw()
   note_off()
-  local t
-
   for t = 1, 4 do
     -- check division
     div = clock_divider(t)
@@ -245,7 +259,7 @@ function count()
       local pos = vials[t].pos
       -- trigger note
       if vials[t].seq[pos] == 1 then
-        if math.random(100) <= vials[t].prob and vials[t].mute == 0 then
+        if rand(100) <= vials[t].prob and vials[t].mute == 0 then
           engine.trig(t - 1)
           if midi_send then
             local note = params:get(t .. ":_midi_note")
@@ -261,16 +275,18 @@ function count()
   just_started = false
 end
 
+local power = math.pow
+
 local function dec_to_bin(num)
   local total = 0
   local modifier = 0
   local value = ""
-  while math.pow(2, modifier) <= num do
+  while power(2, modifier) <= num do
     modifier = modifier + 1
   end
   for i = modifier, 1, -1 do
-    if math.pow(2, i - 1) + total <= num then
-      total = total + math.pow(2, i - 1)
+    if power(2, i - 1) + total <= num then
+      total = total + power(2, i - 1)
       value = value .. "1"
     else
       value = value .. "0"
@@ -381,7 +397,6 @@ local function table_index(t)
 end
 
 local function first_index(t)
-  local iter
   for iter = 1, #t do
     if t[iter] == 1 then
       return iter
@@ -390,7 +405,6 @@ local function first_index(t)
 end
 
 local function make_nil(t, ind)
-  local iter
   if ind > 1 then
     for iter = 1, ind - 1 do
       t[iter] = nil
@@ -407,7 +421,6 @@ end
 
 local function tally(t)
   local freq = 0
-  local iter
   for iter = 1, #t do
     if t[iter] == 1 then
       freq = freq + 1
@@ -417,7 +430,6 @@ local function tally(t)
 end
 
 local function check_nil(t)
-  local iter
   for iter = 1, #t do
     if t[iter] ~= nil then
       return false
@@ -471,10 +483,10 @@ function redraw()
     screen.move(80, 10)
     screen.level(color)
     screen.font_face(word_font)
-    screen.text("track ")
+    screen.text("pattern ")
     screen.level(value_color)
     screen.font_face(number_font)
-    screen.text(track)
+    screen.text(current_vials)
     if vials[track].mute == 1 then
       screen.font_face(word_font)
       screen.text("m")
@@ -653,7 +665,7 @@ end
 
 function enc(n, d)
   if delay_view < 1 and reverb_view < 1 and param_view < 1 then
-    if n == 2 and not key3_hold then -- change track
+    if n == 2 and not key2_hold then -- change track
       track = track + d
       if track == 0 then
         track = 4
@@ -664,16 +676,25 @@ function enc(n, d)
       change_focus()
     end
     if n == 3 then -- change decimal
-      if not key3_hold then
+      if not key2_hold and not key3_hold then
         change_decimal(d)
-      elseif key3_hold then
+      elseif key2_hold then
         vials[track].prob = (vials[track].prob + d) % 101
+      elseif key3_hold then
+        if d == -1 and current_vials == 1 then
+          current_vials = 15
+        elseif d == 1 and current_vials == 15 then
+          current_vials = 1
+        else
+          current_vials = current_vials + d
+        end
+        load_save(current_vials, 1)
       end
     end
     if n == 1 then -- change bpm
       params:delta("bpm", d)
     end
-    if n == 2 and key3_hold then -- change division
+    if n == 2 and key2_hold then -- change division
       local div_amt = vials[track].division
       if div_amt == 1 and d == -1 then
         vials[track].division = 1
@@ -722,20 +743,95 @@ function enc(n, d)
   redraw()
 end
 
+function vials_save() -- save seq data
+  local file = io.open(_path.data .. "vials.data", "w+")
+  io.output(file)
+  io.write("v1" .. "\n")
+  for x = 1, 15 do
+    for y = 1, 4 do
+      for z = 1, 4 do
+        io.write(vi[x][y].steps[z] .. "\n")
+      end
+      io.write(vi[x][y].rotations .. "\n")
+      io.write(vi[x][y].mute .. "\n")
+      io.write(vi[x][y].division .. "\n")
+      io.write(vi[x][y].prob .. "\n")
+      io.write(vi[x][y].loop .. "\n")
+    end
+  end
+  io.write(params:get("bpm") .. "\n")
+  io.close(file)
+end
+
+function vials_load() -- load seq data
+  local file = io.open(_path.data .. "vials.data", "r")
+  if file then
+    print("datafile found")
+    io.input(file)
+    if io.read() == "v1" then
+      for x = 1, 15 do
+        for y = 1, 4 do
+          for z = 1, 4 do
+            vi[x][y].steps[z] = tonumber(io.read()) or 0
+          end
+          vi[x][y].rotations = tonumber(io.read()) or 0
+          vi[x][y].mute = tonumber(io.read()) or 0
+          vi[x][y].division = tonumber(io.read()) or 1
+          vi[x][y].prob = tonumber(io.read()) or 100
+          vi[x][y].loop = tonumber(io.read()) or 0
+        end
+      end
+      params:set("bpm", tonumber(io.read()) or 100)
+    else
+      print("invalid data file")
+    end
+    io.close(file)
+  end
+end
+
+local function menu_save()
+  vi[current_vials] = deepcopy(vials)
+end
+
+function load_save(x, y)
+  if y == 1 then -- load
+    current_vials = x
+    vials = deepcopy(vi[current_vials])
+    print("loaded: " .. x)
+    for i = 1, 4 do
+      vials[i].seq = generate_sequence(i)
+    end
+    redraw()
+    grid_redraw()
+  else -- save
+    vi[x] = deepcopy(vials)
+    print("saved: " .. x)
+  end
+end
+
 -- GRID FUNCTIONS
 function grid_redraw()
   if g == nil then
     return
   end
-  local iter  -- binary pattern leds
-  for iter = 1, 8 do
+  if ls_view == 1 then
+    g:all(0)
+    for x = 1, 15 do
+      g:led(x, 1, 3)
+      g:led(x, 8, 3)
+    end
+    return
+  else
+    g:all(0)
+    g:led(16, 5, 3)
+  end
+  for iter = 1, 8 do -- binary pattern leds
     if binary_input[iter] ~= nil and iter <= #binary_input then
       g:led(iter, 7, 7 + 7 * binary_input[iter])
     else
       g:led(iter, 7, 2)
     end
   end
-  local t
   for t = 1, 4 do
     g:led(1, t, 7) -- sample triggers
     g:led(9, t, 3) -- param view
@@ -758,19 +854,16 @@ function grid_redraw()
   g:led(10, 8, (3 + delay_in * 10))
   g:led(12, 8, 3)
   g:led(13, 8, 3)
-  local reviter  -- reverb
-  for reviter = 10, 14 do
-    g:led(reviter, 7, 3)
+  for i = 10, 14 do -- reverb
+    g:led(i, 7, 3)
   end
-  local tr  -- 4x4 location
-  for tr = 1, 4 do
+  for tr = 1, 4 do -- 4x4 location
     if tr == track then
       g:led(4, tr, 5)
     else
       g:led(4, tr, 0)
     end
   end
-  local sel
   for sel = 0, 3 do
     if sel == selected then
       g:led(sel + 5, 5, 5)
@@ -778,8 +871,7 @@ function grid_redraw()
       g:led(sel + 5, 5, 0)
     end
   end
-  local y  -- loop
-  for y = 1, 4 do
+  for y = 1, 4 do -- loop
     if vials[y].loop > 0 then
       g:led(vials[y].loop + 4, y, 15)
     end
@@ -788,8 +880,7 @@ function grid_redraw()
   g:led(16, 2, 5)
   g:led(15, 1, 5)
   g:led(15, 3, 5)
-  local u  --  calculator
-  for u = 1, 3 do
+  for u = 1, 3 do --  calculator
     for v = 1, 3 do
       g:led(u + 9, v, 7)
     end
@@ -816,6 +907,14 @@ local function new_pos_selector()
 end
 
 g.key = function(x, y, z)
+  if ls_view == 1 and x < 16 then
+    load_save(x, y)
+    return
+  end
+  if x == 16 and y == 5 then
+    ls_view = 1 - ls_view
+  end
+
   if z == 1 then
     if x == 2 and y < 5 then -- mute track
       vials[y].mute = 1 - vials[y].mute
@@ -847,19 +946,6 @@ g.key = function(x, y, z)
         loop_on(y)
       end
     end
-  end
-  if x == 9 and y < 5 then -- param view
-    param_view = z * y
-  end
-  if x == 11 and y == 8 then -- fx
-    delay_view = 0 + z
-    params:set("delay", delay_view)
-    redraw()
-  end
-  if x == 14 and y == 7 then
-    reverb_view = 0 + z
-  end
-  if z == 1 then
     if x == 10 and y == 8 then
       delay_in = 1 - delay_in
       audio.level_eng_cut(delay_in)
@@ -880,7 +966,6 @@ g.key = function(x, y, z)
           params:set(y .. "_reverb_send", -60.0)
         end
       elseif y == 5 then
-        local mute_rev_in
         for mute_rev_in = 1, 4 do
           params:set(mute_rev_in .. "_reverb_send", -60.0)
         end
@@ -905,8 +990,22 @@ g.key = function(x, y, z)
       end
     end
   end
+  if x == 9 and y < 5 then -- param view
+    param_view = z * y
+  end
+  if x == 11 and y == 8 then -- fx
+    delay_view = 0 + z
+    params:set("delay", delay_view)
+    redraw()
+  end
+  if x == 14 and y == 7 then
+    reverb_view = 0 + z
+  end
+  if x == 16 and y == 5 then
+    ls_view = 0 + z
+    grid_redraw()
+  end
   if x <= 8 and y == 8 and z == 1 then -- make a bit nil
-    local iter
     for iter = x, #binary_input do
       binary_input[iter] = nil
     end
@@ -935,7 +1034,6 @@ g.key = function(x, y, z)
       if binary_input[x] == nil or binary_input[x] == 0 then
         if x < index_1 then
           binary_input[x] = 1
-          local j_iter
           for j_iter = x + 1, index_1 - 1 do
             if binary_input[j_iter] == nil then
               binary_input[j_iter] = 0
@@ -943,7 +1041,6 @@ g.key = function(x, y, z)
           end
         elseif x > index_1 then
           binary_input[x] = 1
-          local k_iter
           for k_iter = index_1 + 1, x - 1 do
             if binary_input[k_iter] == nil then
               binary_input[k_iter] = 0
@@ -959,7 +1056,6 @@ g.key = function(x, y, z)
           else
             binary_input[x] = nil
             local indexx = first_index(binary_input)
-            local n_iter
             for n_iter = x + 1, indexx - 1 do
               binary_input[n_iter] = nil
             end
@@ -1041,7 +1137,6 @@ g.key = function(x, y, z)
     end
   end
   if z == 1 and x == 15 and (y == 1 or y == 3) then -- track shift
-    local iter
     local shift = y - 2
     local rotated_tracks = {}
     local t_rotations = {}
@@ -1069,49 +1164,6 @@ g.key = function(x, y, z)
   end
 end
 
-function vials_save() -- save seq data
-  local file = io.open(_path.data .. "vials.data", "w+")
-  io.output(file)
-  io.write("v1" .. "\n")
-  for x = 1, 4 do
-    for y = 1, 4 do
-      io.write(vials[x].steps[y] .. "\n")
-    end
-    io.write(vials[x].rotations .. "\n")
-    io.write(vials[x].mute .. "\n")
-    io.write(vials[x].division .. "\n")
-    io.write(vials[x].prob .. "\n")
-    io.write(vials[x].loop .. "\n")
-  end
-  io.write(params:get("bpm") .. "\n")
-  io.write()
-  io.close(file)
-end
-
-function vials_load() -- load seq data
-  local file = io.open(_path.data .. "vials.data", "r")
-  if file then
-    print("datafile found")
-    io.input(file)
-    if io.read() == "v1" then
-      for x = 1, 4 do
-        for y = 1, 4 do
-          vials[x].steps[y] = tonumber(io.read()) or 0
-        end
-        vials[x].rotations = tonumber(io.read()) or 0
-        vials[x].mute = tonumber(io.read()) or 0
-        vials[x].division = tonumber(io.read()) or 1
-        vials[x].prob = tonumber(io.read()) or 100
-        vials[x].loop = tonumber(io.read()) or 0
-      end
-      params:set("bpm", tonumber(io.read()) or 100)
-    else
-      print("invalid data file")
-    end
-    io.close(file)
-  end
-end
-
 function init()
   clk.on_step = count -- clock setup
   clk.on_select_internal = function()
@@ -1124,6 +1176,7 @@ function init()
   params:add_number("midi_chan", "midi chan", 1, 16, 1)
   params:add_option("send_midi", "send midi", {"yes", "no"}, 1)
   params:add_separator()
+  params:add {type = "trigger", id = "Save", name = "save pattern", action = menu_save}
   params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
   params:add_separator()
   for channel = 1, 4 do
@@ -1135,7 +1188,7 @@ function init()
   hs.init() -- halfsecond
   params:set("delay", 0)
   vials_load()
-  local init_t
+  vials = deepcopy(vi[current_vials])
   for init_t = 1, 4 do
     vials[init_t].seq = generate_sequence(init_t)
     track = track + 1
