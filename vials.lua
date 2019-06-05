@@ -89,10 +89,9 @@ local calc_hold = 0
 local calc_input = {}
 local rotate_dirty = false
 local binary_input = {nil, nil, nil, nil, nil, nil, nil}
-vials = {} -- sequence vars
+local vials = {} -- sequence vars
 local note_off_queue = {34, 35, 36, 37}
-local save_dirty = {}
-vi = {}
+local vi = {}
 for j = 1, 15 do
   vi[j] = {}
   for v = 1, 4 do
@@ -109,7 +108,6 @@ for j = 1, 15 do
   end
 end
 local current_vials = 1
-local vials_to_save = 1
 local selected = 0
 local decimal_value = 0
 local track = 1
