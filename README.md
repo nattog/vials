@@ -15,18 +15,20 @@ on this page
 - ENC 3 changes value
 
 - KEY 1 takes you to PARAMS
-- Hold KEY 1 to start the sequencer
-- While playing, hold KEY 1 for SEQ ALT
+- hold KEY 1 to start the sequencer
+- khile playing, hold KEY 1 for SEQ ALT
 - SEQ ALT + KEY 2 resets the sequence
 - SEQ ALT + KEY 3 stops the sequence
 
 - KEY 2 changes slot on selected track
 - KEY 2 + KEY 3 mutes the track
 
-- Hold KEY 3 for TRACK ALT
+- hold KEY 2 for TRACK ALT
 - TRACK ALT + KEY 2 rotates track sequence
 - TRACK ALT + ENC 2 changes track division
 - TRACK ALT + ENC 3 changes track probability
+
+- hold KEY 3 + ENC 3 to load pattern
 
 each track is configured to send midi and trigger a sample. please see the PARAMETERS menu for configuration.
 
@@ -68,9 +70,15 @@ using grid greatly expands the performability of vials. it allows for looping, c
     - kill echo
 * **Q** - binary input, tap for 1, tap twice for 0
 * **R** - trim binary sequence at index
+* **S** - hold to access load/save 
+* **T** - load pattern
+* **U** - save pattern
 
 ## saving / loading
-vials saves the sequence data each time the sequencer is stopped. on selecting vials, it automatically loads where you left off. 
+on start vials loads a session of 15 patterns from memory
+within the session patterns can be saved and loaded
+the session is saved to disk when stopped
+note the current pattern must be saved to the session to be recalled.
 
 ## vague ideas for the future
 * grid view for saving/loading patterns / psets
