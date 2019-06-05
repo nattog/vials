@@ -16,7 +16,7 @@ on this page
 
 - KEY 1 takes you to PARAMS
 - hold KEY 1 to start the sequencer
-- khile playing, hold KEY 1 for SEQ ALT
+- while playing, hold KEY 1 for SEQ ALT
 - SEQ ALT + KEY 2 resets the sequence
 - SEQ ALT + KEY 3 stops the sequence
 
