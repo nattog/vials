@@ -122,10 +122,8 @@ local delay_view = 0
 local delay_in = 1
 local reverb_view = 0
 local ls_view = 0
-local ceil = math.ceil
-local rand = math.random
 local power = math.pow
-local floor = math.floor
+local mceil = math.ceil
 
 local function deepcopy(orig)
   local orig_type = type(orig)
@@ -222,7 +220,7 @@ local function clock_divider(track)
 end
 
 local function round(what, precision)
-  return floor(what * power(10, precision) + 0.5) / power(10, precision)
+  return math.floor(what * power(10, precision) + 0.5) / power(10, precision)
 end
 
 local function rotate(m, dir)
@@ -241,6 +239,8 @@ local function rotate(m, dir)
   end
   return m
 end
+
+local rand = math.random
 
 function count()
   local midi_send = (params:get("send_midi") == 1)
@@ -487,10 +487,6 @@ function redraw()
     screen.level(value_color)
     screen.font_face(number_font)
     screen.text(current_vials)
-    if vials[track].mute == 1 then
-      screen.font_face(word_font)
-      screen.text("m")
-    end
     screen.move(0, 20)
     screen.font_size(6)
     screen.font_face(15)
@@ -530,6 +526,10 @@ function redraw()
     screen.level(value_color)
     screen.font_face(number_font)
     screen.text(vials[track].division)
+    if vials[track].mute == 1 then
+      screen.font_face(word_font)
+      screen.text("   m")
+    end
     screen.move(80, 42)
     screen.level(color)
     screen.font_face(word_font)
@@ -551,7 +551,7 @@ function redraw()
   elseif delay_view > 0 then
     screen_x = (15 * params:get("delay_rate"))
     screen_y = 10
-    screenL = ceil(params:get("delay") * 10) + 3
+    screenL = mceil(params:get("delay") * 10) + 3
     for i = 1, (params:get("delay_feedback") * 40) + 1 do
       screen.font_face(11)
       screen.level(screenL)
@@ -567,7 +567,7 @@ function redraw()
     screen.update()
   elseif reverb_view > 0 then
     screen.line_width(2)
-    screen.level(15 - (ceil(params:get("reverb_damp") * 15)))
+    screen.level(15 - (mceil(params:get("reverb_damp") * 15)))
     screen.rect(0, 80, params:get("reverb_room_size") * 125, -80 - params:get("reverb_level"))
     screen.fill()
     screen.update()
@@ -595,7 +595,7 @@ function redraw()
       screen.level(color)
     end
     screen.move(60, 40)
-    screen.text("cutoff " .. ceil(params:get(param_view .. "_filter_cutoff")))
+    screen.text("cutoff " .. mceil(params:get(param_view .. "_filter_cutoff")))
     screen.move(60, 50)
     screen.text("res " .. round(params:get(param_view .. "_filter_res"), 3))
     screen.move(60, 60)
