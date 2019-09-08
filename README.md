@@ -2,7 +2,7 @@
 
 ## a sequencer for norns
 
-each track features 4 slots containing decimal values between 0 and 255. a decimal is converted to its binary representation and played in a sequence of binary where 1 sends a trigger and 0 denotes a break. a track can be muted, has its own probability and divisions, each sequence can be rotated along its binary string. the sequencer is enhanced for performance using a grid, can be externally clocked and sends midi notes.
+each track features 4 slots containing decimal values between 0 and 255. a decimal is converted to its binary representation and played in a sequence of binary where 1 sends a trigger and 0 denotes a break. a track can be muted, has its own probability and divisions, each sequence can be rotated along its binary string. the sequencer is enhanced for performance using a grid, can be externally clocked and outputs midi.
 
 
 ## home
@@ -30,11 +30,11 @@ on this page
 
 - hold KEY 3 + ENC 3 to load pattern
 
-each track is configured to send midi and trigger a sample. please see the PARAMETERS menu for configuration.
+each track is configured to output midi and trigger a sample. see the PARAMETERS menu for configuration.
 
 ## grid
 
-using grid greatly expands the performability of vials. it allows for looping, changing sequence values in both binary and decimals, alongside some performance controls such as sample triggers, mutes, reverb and delay controls and randomisation. reverb and delay effects have their own view, found by holding the reverb and delay view keys which then allow for fx control with the norns encoders.
+grid expands the performability of vials, allowing looping and editing sequence values in both binary and decimals. performance controls such as sample triggers, mutes, reverb and delay controls and randomisation are also exposed on grid level. reverb and delay effects have their own view, found by holding the reverb and delay view keys which then allow for fx control with the norns encoders.
 
 ![alt text](assets/grid_interface.jpg "grid interface")
 * **A** - trigger samples
@@ -81,6 +81,6 @@ the session is saved to disk when stopped
 note the current pattern must be saved to the session to be recalled.
 
 ## vague ideas for the future
-* add seq directions
+* fills
 * swing 
 * accents
