@@ -2,11 +2,9 @@
 -- a binary rhythmbox
 -- v1.1 @nattog
 --
--- - - - - - - - - - - - - - - - -
 -- 4x4 decimal vials
 -- represented binary
--- create rhythms
--- - - - - - - - - - - - - - - - -
+--
 -- hold k1 to start
 --
 -- k2 change step
@@ -17,8 +15,8 @@
 -- key combos, hold first
 -- k1 + k2 resets
 -- k1 + k3 stops
--- k2 + k3 mute
--- k2 + k2 rotates binary sequence
+-- k2 + k3 mute track
+-- k2 + e2 rotates binary sequence
 -- k2 + e3 probability
 -- k3 + e3 loads pattern
 --
@@ -35,8 +33,8 @@
 -- hold right next to 3
 -- for XX, XXX
 --
--- shift sequences up or down
--- rotate sequence left or right
+-- shift seqs vertically
+-- rotate seq horizontally
 --
 -- hold to load (top) or save (bottom)
 --
