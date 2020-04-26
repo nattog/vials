@@ -143,6 +143,11 @@ local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 local mceil = math.ceil
 local rand = math.random
 
+-- params
+chan_params = {"_vol", "_speed", "_dist", "_filter_cutoff", "_filter_res", "_filter_env_mod"}
+reverb_params = {"reverb_level", "reverb_room_size", "reverb_damp"}
+delay_params = {"delay", "delay_rate", "delay_feedback"}
+
 function pulse()
   while playing do
     clock.sync(1 / 4)
@@ -516,11 +521,9 @@ function key(n, z)
       end
     end
     if z == 1 and key1_hold then
+      reset_position() -- resets
       if n == 3 then -- stop
         stop()
-        reset_positions()
-      elseif n == 2 then -- reset
-        reset_positions()
       end
     end
     if n == 2 then --key 2 CHANGE SLOT
@@ -587,38 +590,14 @@ function enc(n, d)
       vials[track].division = util.clamp(div_amt + d, 1, 8)
     end
   elseif delay_view > 0 then
-    if n == 1 then
-      params:delta("delay", d)
-    elseif n == 2 then
-      params:delta("delay_rate", d)
-    elseif n == 3 then
-      params:delta("delay_feedback", d)
-    end
+    params:delta(delay_params[n], d)
   elseif reverb_view > 0 then
-    if n == 1 then
-      params:delta("reverb_level", d)
-    elseif n == 2 then
-      params:delta("reverb_room_size", d)
-    elseif n == 3 then
-      params:delta("reverb_damp", d)
-    end
+    params:delta(reverb_params[n], d)
   elseif param_view > 0 then
     if param_sel == 1 then
-      if n == 1 then
-        params:delta(param_view .. "_vol", d)
-      elseif n == 2 then
-        params:delta(param_view .. "_speed", d)
-      elseif n == 3 then
-        params:delta(param_view .. "_dist", d)
-      end
+      params:delta(param_view .. chan_params[n], d)
     else
-      if n == 1 then
-        params:delta(param_view .. "_filter_cutoff", d)
-      elseif n == 2 then
-        params:delta(param_view .. "_filter_res", d)
-      elseif n == 3 then
-        params:delta(param_view .. "_filter_env_mod", d)
-      end
+      params:delta(param_view .. chan_params[n + 3], d)
     end
   end
   screen_dirty = true
