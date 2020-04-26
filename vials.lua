@@ -299,6 +299,8 @@ local function change_focus()
   decimal_value = vials[track].steps[selected + 1]
   calc_binary_input()
   calc_input = {}
+  screen_dirty = true
+  grid_dirty = true
 end
 
 local function loop_off(t)
@@ -311,8 +313,6 @@ end
 function change_selected(inp)
   selected = (selected + inp) % 4
   change_focus()
-  screen_dirty = true
-  grid_dirty = true
 end
 
 function change_decimal(d)
@@ -471,6 +471,7 @@ function redraw()
     screen.level(15 - (mceil(params:get("reverb_damp") * 15)))
     screen.rect(0, 80, params:get("reverb_room_size") * 125, -80 - params:get("reverb_level"))
     screen.fill()
+    screen.update()
   elseif param_view > 0 then
     local sample_name = vials_utils.split(params:get(param_view .. "_sample"), "/")
     screen.font_face(word_font)
