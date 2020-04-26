@@ -68,47 +68,47 @@
 
 -- engine
 engine.name = "Ack"
-local ack = require "ack/lib/ack"
+ack = require "ack/lib/ack"
 
 -- libraries
-local ControlSpec = require "controlspec"
-local vials_utils = include("lib/vials_utils")
-local hs = include "awake/lib/halfsecond"
+ControlSpec = require "controlspec"
+vials_utils = include("lib/vials_utils")
+hs = include "awake/lib/halfsecond"
 
 -- connection
-local g = grid.connect()
-local m = midi.connect()
+g = grid.connect()
+m = midi.connect()
 
 -- clock
-local clock_id
+clock_id
 
 -- hardware state
-local key1_hold = false
-local key2_hold = false
-local key3_hold = false
-local calc_hold = 0
+key1_hold = false
+key2_hold = false
+key3_hold = false
+calc_hold = 0
 
 -- screen variables
-local SCREEN_FRAMERATE = 15
-local screen_dirty = true
-local color = 3
-local value_color = color + 5
-local number = 0
-local screen_x = 0
-local screen_y = 0
-local word_font = 1
-local number_font = 23
-local rotate_dirty = false
-local param_view = 0
-local param_sel = 1
-local delay_view = 0
-local delay_in = 1
-local reverb_view = 0
-local loadsave_view = 0
+SCREEN_FRAMERATE = 15
+screen_dirty = true
+color = 3
+value_color = color + 5
+number = 0
+screen_x = 0
+screen_y = 0
+word_font = 1
+number_font = 23
+rotate_dirty = false
+param_view = 0
+param_sel = 1
+delay_view = 0
+delay_in = 1
+reverb_view = 0
+loadsave_view = 0
 
 -- grid variables
-local GRID_FRAMERATE = 30
-local grid_dirty = true
+GRID_FRAMERATE = 30
+grid_dirty = true
 g_off = 1
 g_low = 3
 g_mid = 5
@@ -116,13 +116,13 @@ g_high = 7
 g_active = 14
 
 -- sequence variables
-local vials = {}
-local playing = false
-local reset = false
-local binary_input = {nil, nil, nil, nil, nil, nil, nil}
-local calc_input = {}
-local note_off_queue = {34, 35, 36, 37}
-local vi = {}
+vials = {}
+playing = false
+reset = false
+binary_input = {nil, nil, nil, nil, nil, nil, nil}
+calc_input = {}
+note_off_queue = {34, 35, 36, 37}
+vi = {}
 for pat = 1, 15 do
   vi[pat] = {}
   for tr = 1, 4 do
@@ -138,16 +138,16 @@ for pat = 1, 15 do
     }
   end
 end
-local current_vials = 1
-local selected = 0
-local decimal_value = 0
-local track = 1
-local meta_position = 0
-local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
+current_vials = 1
+selected = 0
+decimal_value = 0
+track = 1
+meta_position = 0
+div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 
 -- aliases
-local mceil = math.ceil
-local rand = math.random
+mceil = math.ceil
+rand = math.random
 
 -- ui params
 chan_params = {"_vol", "_speed", "_dist", "_filter_cutoff", "_filter_res", "_filter_env_mod"}
@@ -174,7 +174,7 @@ function start()
   clock.transport.start()
 end
 
-local function note_off()
+function note_off()
   if params:get("send_midi") == 1 then
     for i = 1, #note_off_queue do
       m:note_off(note_off_queue[i])
@@ -182,7 +182,7 @@ local function note_off()
   end
 end
 
-local function reset_positions()
+function reset_positions()
   meta_position = 0
   just_started = true
   for iter = 1, 4 do
@@ -198,7 +198,7 @@ function stop()
   vials_save()
 end
 
-local function reset_vials()
+function reset_vials()
   for v = 1, 4 do
     vials[v] = {
       pos = 0,
@@ -217,7 +217,7 @@ local function reset_vials()
   grid_dirty = true
 end
 
-local function reset_pattern()
+function reset_pattern()
   for iter = 1, 4 do
     vials[iter].pos = 0
   end
@@ -225,7 +225,7 @@ local function reset_pattern()
   note_off()
 end
 
-local function clock_divider(track)
+function clock_divider(track)
   return vials[track].division
 end
 
@@ -263,24 +263,21 @@ function count()
   just_started = false
 end
 
-local function binary_string(track)
-  local x = ""
-  local i
-  for i = 1, 4 do
-    if vials[track].steps[i] ~= nil and vials[track].steps[i] ~= 0 then
-      local y = vials_utils.dec_to_bin(vials[track].steps[i])
-      x = x .. y
+function binary_string(track)
+  local str = ""
+  for step = 1, 4 do
+    if vials[track].steps[step] ~= nil and vials[track].steps[step] ~= 0 then
+      str = str .. vials_utils.dec_to_bin(vials[track].steps[step])
     end
   end
-  return x
+  return str
 end
 
-local function calc_binary_input()
-  local bin_rep = tostring(vials_utils.dec_to_bin(decimal_value))
-  binary_input = vials_utils.split_str(bin_rep)
+function calc_binary_input()
+  return vials_utils.split_str(tostring(vials_utils.dec_to_bin(decimal_value)))
 end
 
-local function loop_on(t)
+function loop_on(t)
   local x
   local track = vials[t]
   bin = vials_utils.dec_to_bin(track.steps[track.loop])
@@ -306,15 +303,15 @@ function generate_sequence(t)
   return seq_rotates
 end
 
-local function change_focus()
+function change_focus()
   decimal_value = vials[track].steps[selected + 1]
-  calc_binary_input()
+  binary_input = calc_binary_input()
   calc_input = {}
   screen_dirty = true
   grid_dirty = true
 end
 
-local function loop_off(t)
+function loop_off(t)
   vials[t].loop = 0
   vials[t].seq = generate_sequence(t)
   screen_dirty = true
@@ -335,12 +332,12 @@ function change_decimal(d)
   elseif vial.loop == selected + 1 then
     loop_on(track)
   end
-  calc_binary_input()
+  binary_input = calc_binary_input()
   screen_dirty = true
   grid_dirty = true
 end
 
-local function make_nil(t, ind)
+function make_nil(t, ind)
   if ind > 1 then
     for iter = 1, ind - 1 do
       t[iter] = nil
@@ -351,11 +348,11 @@ local function make_nil(t, ind)
     end
   end
   decimal_value = 0
-  calc_binary_input()
+  binary_input = calc_binary_input()
   return t
 end
 
-local function position_vis()
+function position_vis()
   local phase
   if vials[track].loop > 0 then
     phrase = vials_utils.dec_to_bin(vials[track].steps[vials[track].loop])
@@ -656,7 +653,7 @@ function vials_load() -- load seq data
   end
 end
 
-local function menu_save()
+function menu_save()
   vi[current_vials] = vials_utils.deepcopy(vials)
 end
 
@@ -754,7 +751,7 @@ function grid_redraw()
   g:refresh()
 end
 
-local function calculate_minus(y)
+function calculate_minus(y)
   if y == 1 then
     return 9
   elseif y == 2 then
@@ -764,7 +761,7 @@ local function calculate_minus(y)
   end
 end
 
-local function new_pos_selector()
+function new_pos_selector()
   calc_input = {}
   decimal_value = vials[track].steps[selected + 1]
   binary_input = vials_utils.split_str(vials_utils.dec_to_bin(decimal_value))
@@ -982,7 +979,7 @@ g.key = function(x, y, z)
     elseif selected + 1 == vials[track].loop then
       loop_on(track)
     end
-    calc_binary_input()
+    binary_input = calc_binary_input()
   end
   if z == 1 and y == 2 then -- rotator
     if #vials[track].seq > 0 then
@@ -1016,7 +1013,7 @@ g.key = function(x, y, z)
       vials[iter].rotations = t_rotations[iter]
       vials[iter].seq = generate_sequence(iter)
     end
-    calc_binary_input()
+    binary_input = calc_binary_input()
   end
   g:refresh()
   screen_dirty = true
