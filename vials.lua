@@ -80,6 +80,9 @@ local hs = include "awake/lib/halfsecond"
 local g = grid.connect()
 local m = midi.connect()
 
+-- clock
+local clock_id
+
 -- hardware state
 local key1_hold = false
 local key2_hold = false
@@ -140,15 +143,24 @@ local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 local mceil = math.ceil
 local rand = math.random
 
-local function pulse()
+function pulse()
   while playing do
     clock.sync(1 / 4)
     count()
   end
 end
 
-local function start()
+function clock.transport.start()
+  clock_id = clock.run(pulse)
+end
+
+function clock.transport.stop()
+  clock.cancel(clock_id)
+end
+
+function start()
   playing = true
+  clock.transport.start()
 end
 
 local function note_off()
@@ -168,8 +180,9 @@ local function reset_positions()
   note_off()
 end
 
-local function stop()
+function stop()
   playing = false
+  clock.transport.stop()
   reset_positions()
   vials_save()
 end
@@ -386,14 +399,14 @@ function redraw()
     screen.font_size(8)
     screen_y = 32
     screen.move(0, screen_y)
-    for i = 1, 4 do
-      for j = 1, 4 do
-        if i == track then
+    for row = 1, 4 do -- draw table
+      for col = 1, 4 do
+        if row == track then
           screen.level(value_color)
         end
-        screen.text(vials[i].steps[j])
-        if i == track then
-          if j == selected + 1 then
+        screen.text(vials[row].steps[col])
+        if row == track then
+          if col == selected + 1 then
             screen.font_size(6)
             screen.text("*")
             screen.font_size(8)
@@ -458,7 +471,6 @@ function redraw()
     screen.level(15 - (mceil(params:get("reverb_damp") * 15)))
     screen.rect(0, 80, params:get("reverb_room_size") * 125, -80 - params:get("reverb_level"))
     screen.fill()
-    screen.update()
   elseif param_view > 0 then
     local sample_name = vials_utils.split(params:get(param_view .. "_sample"), "/")
     screen.font_face(word_font)
@@ -495,13 +507,11 @@ end
 function key(n, z)
   if param_view == 0 then
     if n == 1 then --key 1 === START/STOP
+      key1_hold = z == 1 and true or false
       if z == 1 then
-        key1_hold = true
         if not playing then
           start()
         end
-      else
-        key1_hold = false
       end
     end
     if z == 1 and key1_hold then
@@ -1036,8 +1046,8 @@ g.key = function(x, y, z)
 end
 
 function init()
-  params:add_number("midi_chan", "midi chan", 1, 16, 1)
   params:add_option("send_midi", "send midi", {"yes", "no"}, 1)
+  params:add_number("midi_chan", "midi chan", 1, 16, 1)
   params:add_separator()
   params:add {type = "trigger", id = "Save", name = "save pattern", action = menu_save}
   params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
@@ -1058,8 +1068,6 @@ function init()
   track = 1
   change_focus()
 
-  clock.run(pulse)
-
   local screen_redraw_metro = metro.init()
   screen_redraw_metro.event = function()
     if screen_dirty then
@@ -1070,7 +1078,7 @@ function init()
 
   local grid_redraw_metro = metro.init()
   grid_redraw_metro.event = function()
-    if grid_dirty and grid_device.device then
+    if grid_dirty and g.device then
       grid_dirty = false
       grid_redraw()
     end
