@@ -64,7 +64,6 @@
 -- row below makes nil
 --
 -- PRs welcome
--- thanks!
 --
 
 -- engine
@@ -92,8 +91,6 @@ local calc_hold = 0
 -- screen variables
 local SCREEN_FRAMERATE = 15
 local screen_dirty = true
-local GRID_FRAMERATE = 30
-local grid_dirty = true
 local color = 3
 local value_color = color + 5
 local number = 0
@@ -107,7 +104,16 @@ local param_sel = 1
 local delay_view = 0
 local delay_in = 1
 local reverb_view = 0
-local ls_view = 0
+local loadsave_view = 0
+
+-- grid variables
+local GRID_FRAMERATE = 30
+local grid_dirty = true
+g_off = 1
+g_low = 3
+g_mid = 5
+g_high = 7
+g_active = 14
 
 -- sequence variables
 local vials = {}
@@ -117,10 +123,10 @@ local binary_input = {nil, nil, nil, nil, nil, nil, nil}
 local calc_input = {}
 local note_off_queue = {34, 35, 36, 37}
 local vi = {}
-for j = 1, 15 do
-  vi[j] = {}
-  for v = 1, 4 do
-    vi[j][v] = {
+for pat = 1, 15 do
+  vi[pat] = {}
+  for tr = 1, 4 do
+    vi[pat][tr] = {
       pos = 0,
       prob = 100,
       mute = 0,
@@ -143,7 +149,7 @@ local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 local mceil = math.ceil
 local rand = math.random
 
--- params
+-- ui params
 chan_params = {"_vol", "_speed", "_dist", "_filter_cutoff", "_filter_res", "_filter_env_mod"}
 reverb_params = {"reverb_level", "reverb_room_size", "reverb_damp"}
 delay_params = {"delay", "delay_rate", "delay_feedback"}
@@ -521,7 +527,7 @@ function key(n, z)
       end
     end
     if z == 1 and key1_hold then
-      reset_position() -- resets
+      reset_positions() -- resets
       if n == 3 then -- stop
         stop()
       end
@@ -608,16 +614,16 @@ function vials_save() -- save seq data
   local file = io.open(_path.data .. "vials.data", "w+")
   io.output(file)
   io.write("v1" .. "\n")
-  for x = 1, 15 do
-    for y = 1, 4 do
-      for z = 1, 4 do
-        io.write(vi[x][y].steps[z] .. "\n")
+  for pat = 1, 15 do
+    for tr = 1, 4 do
+      for step = 1, 4 do
+        io.write(vi[pat][tr].steps[step] .. "\n")
       end
-      io.write(vi[x][y].rotations .. "\n")
-      io.write(vi[x][y].mute .. "\n")
-      io.write(vi[x][y].division .. "\n")
-      io.write(vi[x][y].prob .. "\n")
-      io.write(vi[x][y].loop .. "\n")
+      io.write(vi[pat][tr].rotations .. "\n")
+      io.write(vi[pat][tr].mute .. "\n")
+      io.write(vi[pat][tr].division .. "\n")
+      io.write(vi[pat][tr].prob .. "\n")
+      io.write(vi[pat][tr].loop .. "\n")
     end
   end
   io.write(params:get("clock_tempo") .. "\n")
@@ -630,16 +636,16 @@ function vials_load() -- load seq data
     print("datafile found")
     io.input(file)
     if io.read() == "v1" then
-      for x = 1, 15 do
-        for y = 1, 4 do
-          for z = 1, 4 do
-            vi[x][y].steps[z] = tonumber(io.read()) or 0
+      for pat = 1, 15 do
+        for tr = 1, 4 do
+          for step = 1, 4 do
+            vi[pat][tr].steps[step] = tonumber(io.read()) or 0
           end
-          vi[x][y].rotations = tonumber(io.read()) or 0
-          vi[x][y].mute = tonumber(io.read()) or 0
-          vi[x][y].division = tonumber(io.read()) or 1
-          vi[x][y].prob = tonumber(io.read()) or 100
-          vi[x][y].loop = tonumber(io.read()) or 0
+          vi[pat][tr].rotations = tonumber(io.read()) or 0
+          vi[pat][tr].mute = tonumber(io.read()) or 0
+          vi[pat][tr].division = tonumber(io.read()) or 1
+          vi[pat][tr].prob = tonumber(io.read()) or 100
+          vi[pat][tr].loop = tonumber(io.read()) or 0
         end
       end
       params:set("clock_tempo", tonumber(io.read()) or 100)
@@ -675,79 +681,76 @@ function grid_redraw()
   if g == nil then
     return
   end
-  if ls_view == 1 then
+  if loadsave_view == 1 then
     g:all(0)
     for x = 1, 15 do
-      g:led(x, 1, 3)
-      g:led(x, 8, 3)
+      g:led(x, 1, g_low)
+      g:led(x, 8, g_low)
     end
     return
   else
     g:all(0)
-    g:led(16, 5, 3)
+    g:led(16, 5, g_low)
   end
   for iter = 1, 8 do -- binary pattern leds
     if binary_input[iter] ~= nil and iter <= #binary_input then
-      g:led(iter, 7, 7 + 7 * binary_input[iter])
+      g:led(iter, 7, binary_input[iter] == 1 and g_active or g_high)
     else
-      g:led(iter, 7, 2)
+      g:led(iter, 7, g_low)
     end
   end
   for t = 1, 4 do
-    g:led(1, t, 7) -- sample triggers
-    g:led(9, t, 3) -- param view
-    g:led(2, t, 5 + vials[t].mute * 10) -- mutes
-    g:led(3, t, 3) -- reverb send
+    g:led(1, t, g_high) -- sample triggers
+    g:led(9, t, g_low) -- param view
+    g:led(2, t, vials[t].mute == 1 and g_active or g_mid) -- mutes
+    g:led(3, t, g_low) -- reverb send
     for r = 5, 8 do
-      g:led(r, t, 7) -- 4x4 grid
+      g:led(r, t, g_high) -- 4x4 grid
     end
   end
-  if meta_position % 4 == 0 then -- clock indicator
-    g:led(16, 8, 15)
+  if playing then
+    g:led(16, 8, meta_position % 4 == 0 and g_active or g_off) -- beat indicator
   else
-    g:led(16, 8, 1)
+    g:led(16, 8, g_mid)
   end
-  if not playing then
-    g:led(16, 8, 5)
-  end
-  g:led(16, 7, 5) -- reset
-  g:led(11, 8, (3 + delay_view * 10)) -- delay
-  g:led(10, 8, (3 + delay_in * 10))
-  g:led(12, 8, 3)
-  g:led(13, 8, 3)
+  g:led(16, 7, g_mid) -- reset
+  g:led(11, 8, delay_view == 1 and g_active or g_low) -- delay
+  g:led(10, 8, delay_in == 1 and g_active or g_low)
+  g:led(12, 8, g_low)
+  g:led(13, 8, g_low)
   for i = 10, 14 do -- reverb
-    g:led(i, 7, 3)
+    g:led(i, 7, g_low)
   end
   for tr = 1, 4 do -- 4x4 location
     if tr == track then
-      g:led(4, tr, 5)
+      g:led(4, tr, g_mid)
     else
       g:led(4, tr, 0)
     end
   end
   for sel = 0, 3 do
     if sel == selected then
-      g:led(sel + 5, 5, 5)
+      g:led(sel + 5, 5, g_mid)
     else
       g:led(sel + 5, 5, 0)
     end
   end
   for y = 1, 4 do -- loop
     if vials[y].loop > 0 then
-      g:led(vials[y].loop + 4, y, 15)
+      g:led(vials[y].loop + 4, y, g_active)
     end
   end
-  g:led(14, 2, 5) -- rotator
-  g:led(16, 2, 5)
-  g:led(15, 1, 5)
-  g:led(15, 3, 5)
+  g:led(14, 2, g_mid) -- rotator
+  g:led(16, 2, g_mid)
+  g:led(15, 1, g_mid)
+  g:led(15, 3, g_mid)
   for u = 1, 3 do --  calculator
     for v = 1, 3 do
-      g:led(u + 9, v, 7)
+      g:led(u + 9, v, g_high)
     end
-    g:led(11, 4, 7)
+    g:led(11, 4, g_high)
   end
-  g:led(13, 1, 2 + calc_hold * 10) -- calc_hold
+  g:led(13, 1, g_active) -- calc_hold
   g:refresh()
 end
 
@@ -768,12 +771,12 @@ local function new_pos_selector()
 end
 
 g.key = function(x, y, z)
-  if ls_view == 1 and x < 16 then
+  if loadsave_view == 1 and x < 16 then
     load_save(x, y)
     return
   end
   if x == 16 and y == 5 then
-    ls_view = 1 - ls_view
+    loadsave_view = 1 - loadsave_view
   end
 
   if z == 1 then
@@ -863,7 +866,7 @@ g.key = function(x, y, z)
     reverb_view = 0 + z
   end
   if x == 16 and y == 5 then
-    ls_view = 0 + z
+    loadsave_view = 0 + z
     grid_dirty = true
   end
   if x <= 8 and y == 8 and z == 1 then -- make a bit nil
