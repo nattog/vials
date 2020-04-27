@@ -78,7 +78,7 @@ g = grid.connect()
 m = midi.connect()
 
 -- clock
-clock_id
+clock_id = nil
 
 -- hardware state
 key1_hold = false
@@ -583,7 +583,7 @@ function enc(n, d)
         load_save(current_vials, 1)
       end
     end
-    if n == 1 then -- change bpm
+    if n == 1 and params:string("clock_source") == "internal" then -- change internal bpm
       params:delta("clock_tempo", d)
     end
     if n == 2 and key2_hold then -- change division
