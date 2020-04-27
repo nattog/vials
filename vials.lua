@@ -73,6 +73,8 @@ vials_utils = include("lib/vials_utils")
 Passthrough = include("lib/passthrough")
 hs = include "awake/lib/halfsecond"
 
+tab = require "tabutil"
+
 -- connection
 g = grid.connect()
 m = midi.connect()
@@ -104,6 +106,10 @@ delay_in = 1
 reverb_view = 0
 loadsave_view = 0
 
+looping = {state = false, x = 1, y = 1}
+muting = {state = false, x = 1, y = 2}
+paraming = {state = false, x = 1, y = 3}
+reverbing = {state = false, x = 1, y = 4}
 -- grid variables
 GRID_FRAMERATE = 30
 grid_dirty = true
@@ -543,17 +549,7 @@ function key(n, z)
       end
     end
     if n == 2 and z == 1 and key3_hold then -- ROTATE
-      vials[track].rotations = vials[track].rotations + 1
-      if vials[track].loop > 0 then
-        if vials[track].rotations >= #vials_utils.dec_to_bin(vials[track].steps[vials[track].loop]) then
-          vials[track].rotations = 0
-        end
-      else
-        if vials[track].rotations >= #(vials[track].seq) then
-          vials[track].rotations = 0
-        end
-      end
-      vials[track].seq = generate_sequence(track)
+      rotate_track("right")
     end
     if n == 3 and z == 1 and key2_hold then -- MUTE TRACK
       vials[track].mute = 1 - vials[track].mute
@@ -688,10 +684,53 @@ function grid_calculator(x, y, level, low_level, active_level)
   g:led(x + 3, y, calc_hold == 1 and active_level or low_level) -- calc_hold
 end
 
-function grid_4x4(x, y, level)
-  for col = y, y + 3 do
-    for row = x, x + 3 do
-      g:led(row, col, level)
+function handle_track_press(y, z)
+  if paraming.state then
+    param_view = z * y
+  elseif z == 1 then
+    if muting.state then
+      vials[y].mute = 1 - vials[y].mute
+    else
+      track = y
+      change_focus()
+    end
+  elseif reverbing.state and z == 1 then
+    if params:get(y .. "_reverb_send") == -60.0 then
+      params:set(y .. "_reverb_send", 0)
+    else
+      params:set(y .. "_reverb_send", -60.0)
+    end
+  else
+    if z == 1 then
+      engine.trig(y - 1)
+    end
+  end
+  grid_dirty = true
+  screen_dirty = true
+end
+
+function handle_action_press(y)
+  muting.state = false
+  reverbing.state = false
+  paraming.state = false
+  looping.state = false
+  if y == 1 then
+    looping.state = looping.state and false or true
+  elseif y == 2 then
+    muting.state = muting.state and false or true
+  elseif y == 3 then
+    paraming.state = paraming.state and false or true
+  elseif y == 4 then
+    reverbing.state = reverbing.state and false or true
+  end
+  grid_dirty = true
+end
+
+function grid_4x4(x, y, low, mid, active)
+  for col = y, y + 3 do -- 1, 4
+    for row = x, x + 3 do -- 5, 8
+      is_selected = col == track and selected == row - 5
+      g:led(row, col, row - 4 == vials[col].loop and active or is_selected and mid or low)
     end
   end
 end
@@ -707,60 +746,42 @@ function grid_redraw()
       g:led(x, 1, g_low)
       g:led(x, 8, g_low)
     end
-    return
+    g:refresh()
   else
     g:all(0)
     g:led(16, 5, g_low)
-  end
-  for iter = 1, 8 do -- binary pattern leds
-    if binary_input[iter] ~= nil and iter <= #binary_input then
-      g:led(iter, 7, binary_input[iter] == 1 and g_active or g_high)
+    for i = 1, 8 do -- binary pattern leds
+      if binary_input[i] ~= nil and i <= #binary_input then
+        g:led(i, 7, binary_input[i] == 1 and g_active or g_high)
+      else
+        g:led(i, 7, g_low)
+      end
+    end
+    g:led(looping.x, looping.y, looping.state and g_high or g_low)
+    g:led(muting.x, muting.y, muting.state and g_high or g_low)
+    g:led(paraming.x, paraming.y, paraming.state and g_high or g_low)
+    g:led(reverbing.x, reverbing.y, reverbing.state and g_high or g_low)
+    for t = 1, 4 do
+      g:led(3, t, vials[t].mute == 1 and g_low or g_high) -- sample triggers
+    end
+    grid_4x4(5, 1, g_low, g_high, g_active)
+    if playing then
+      g:led(16, 8, meta_position % 4 == 0 and g_active or g_off) -- beat indicator
     else
-      g:led(iter, 7, g_low)
+      g:led(16, 8, g_mid)
     end
-  end
-  for t = 1, 4 do
-    g:led(1, t, g_high) -- sample triggers
-    g:led(9, t, g_low) -- param view
-    g:led(2, t, vials[t].mute == 1 and g_active or g_mid) -- mutes
-    g:led(3, t, g_low) -- reverb send
-  end
-  grid_4x4(5, 1, g_high)
-  if playing then
-    g:led(16, 8, meta_position % 4 == 0 and g_active or g_off) -- beat indicator
-  else
-    g:led(16, 8, g_mid)
-  end
-  g:led(16, 7, g_mid) -- reset
-  g:led(11, 8, delay_view == 1 and g_active or g_low) -- delay
-  g:led(10, 8, delay_in == 1 and g_active or g_low)
-  g:led(12, 8, g_low)
-  g:led(13, 8, g_low)
-  for i = 10, 14 do -- reverb
-    g:led(i, 7, g_low)
-  end
-  for tr = 1, 4 do -- 4x4 location
-    if tr == track then
-      g:led(4, tr, g_mid)
-    else
-      g:led(4, tr, 0)
+    g:led(16, 7, g_mid) -- reset
+    g:led(11, 8, delay_view == 1 and g_active or g_low) -- delay
+    g:led(10, 8, delay_in == 1 and g_active or g_low)
+    g:led(12, 8, g_low)
+    g:led(13, 8, g_low)
+    for i = 10, 14 do -- reverb
+      g:led(i, 7, g_low)
     end
+    grid_rotator(14, 1, g_mid)
+    grid_calculator(10, 1, g_high, g_low, g_active)
+    g:refresh()
   end
-  for sel = 0, 3 do
-    if sel == selected then
-      g:led(sel + 5, 5, g_mid)
-    else
-      g:led(sel + 5, 5, 0)
-    end
-  end
-  for y = 1, 4 do -- loop
-    if vials[y].loop > 0 then
-      g:led(vials[y].loop + 4, y, g_active)
-    end
-  end
-  grid_rotator(14, 1, g_mid)
-  grid_calculator(10, 1, g_high, g_low, g_active)
-  g:refresh()
 end
 
 function calculate_minus(y)
@@ -773,25 +794,142 @@ function calculate_minus(y)
   end
 end
 
+function track_shift(shift)
+  local rotated_tracks = {}
+  local t_rotations = {}
+  if shift == 1 then
+    rotated_tracks = {vials[4].steps, vials[1].steps, vials[2].steps, vials[3].steps}
+    t_rotations = {vials[4].rotations, vials[1].rotations, vials[2].rotations, vials[3].rotations}
+  else
+    rotated_tracks = {vials[2].steps, vials[3].steps, vials[4].steps, vials[1].steps}
+    t_rotations = {vials[2].rotations, vials[3].rotations, vials[4].rotations, vials[1].rotations}
+  end
+  for i = 1, 4 do
+    vials[i].steps = rotated_tracks[i]
+    vials[i].rotations = t_rotations[i]
+    vials[i].seq = generate_sequence(i)
+  end
+end
+
+function rotate_track(dir)
+  if #vials[track].seq > 0 then
+    if dir == "left" then
+      vials[track].rotations = vials[track].rotations - 1
+      if vials[track].rotations == -1 then
+        vials[track].rotations = #vials[track].seq - 1
+      end
+    else
+      vials[track].rotations = vials[track].rotations + 1
+      if vials[track].rotations >= #vials[track].seq then
+        vials[track].rotations = 0
+      end
+    end
+    vials[track].seq = generate_sequence(track)
+  end
+end
+
+function run_update()
+  if vials[track].loop < 1 then
+    vials[track].seq = generate_sequence(track)
+  elseif selected + 1 == vials[track].loop then
+    loop_on(track)
+  end
+end
+
 function new_pos_selector()
   calc_input = {}
   decimal_value = vials[track].steps[selected + 1]
   binary_input = vials_utils.split_str(vials_utils.dec_to_bin(decimal_value))
 end
 
+function handle_binary_input(x)
+  if vials_utils.check_nil(binary_input) then -- if array of nil
+    binary_input[x] = 1
+    for i = x + 1, #binary_input do
+      binary_input[i] = 0 -- fill rest of input with 0s
+    end
+  else
+    local index_1 = vials_utils.table_index(binary_input)
+    if binary_input[x] == 1 then
+      local first_index = vials_utils.first_index(binary_input)
+      if x == first_index then
+        if vials_utils.tally(binary_input) == 1 then
+          make_nil(binary_input, first_index)
+          decimal_value = 0
+        else
+          binary_input[x] = nil
+          for n = x + 1, vials_utils.first_index(binary_input) - 1 do
+            binary_input[n] = nil
+          end
+        end
+      elseif x > first_index then
+        binary_input[x] = 0
+      end
+    else
+      if x ~= index_1 then
+        binary_input[x] = 1
+        for j = x + 1, index_1 - 1 do
+          binary_input[j] = binary_input[j] == nil and 0
+        end
+      end
+    end
+  end
+  local binary = vials_utils.concatenate_table(binary_input)
+  local newNumber = tonumber(binary, 2)
+  vials[track].steps[selected + 1] = newNumber ~= nil and newNumber or 0
+  decimal_value = vials[track].steps[selected + 1]
+  run_update()
+  g:refresh()
+end
+
+function handle_calc_input(x, y)
+  if y == 4 and (x == 10 or x == 12) then
+    return
+  end
+  local y_reducer = calculate_minus(y)
+  if calc_hold == 0 then
+    calc_input = {}
+    final_input = ""
+    if y == 4 then
+      calc_input[1] = 0
+    else
+      calc_input[1] = x - y_reducer
+    end
+  elseif calc_hold == 1 then
+    if y == 4 then
+      calc_input[#calc_input + 1] = 0
+    else
+      calc_input[#calc_input + 1] = x - y_reducer
+    end
+  end
+  final_input = final_input .. calc_input[1]
+  if #final_input == 3 then
+    calc_hold = 0
+  end
+  if tonumber(final_input) > 255 then
+    final_input = calc_input[1]
+  end
+  calc_input = {}
+  vials[track].steps[selected + 1] = tonumber(final_input)
+  decimal_value = vials[track].steps[selected + 1]
+  if vials[track].loop == 0 then
+    vials[track].seq = generate_sequence(track)
+  elseif selected + 1 == vials[track].loop then
+    loop_on(track)
+  end
+  binary_input = calc_binary_input()
+end
+
 g.key = function(x, y, z)
-  if loadsave_view == 1 and x < 16 then
+  if loadsave_view == 1 and x < 16 and z == 1 then
     load_save(x, y)
     return
   end
-  if x == 16 and y == 5 then
-    loadsave_view = 1 - loadsave_view
-  end
 
   if z == 1 then
-    if x == 2 and y < 5 then -- mute track
-      vials[y].mute = 1 - vials[y].mute
-    end
+    if x == 1 and y <= 5 then
+      handle_action_press(y)
+    end -- actions keys
     if x == 16 and y == 8 then -- start/stop
       if not playing then
         start()
@@ -802,21 +940,18 @@ g.key = function(x, y, z)
     if x == 16 and y == 7 then -- reset sequences
       reset_positions()
     end
-    if x == 4 and y < 5 then -- track/selec nav
+    if x >= 5 and x < 9 and y < 5 then
       track = y
-      new_pos_selector()
-    end
-    if y == 5 and x > 4 and x < 9 then
       selected = x - 5
       new_pos_selector()
-    end
-    if x >= 5 and x < 9 and y < 5 then -- loop
-      if vials[y].loop == x - 4 then
-        vials[y].loop = 0
-        loop_off(y)
-      else
-        vials[y].loop = x - 4
-        loop_on(y)
+      if looping.state then
+        if vials[y].loop == x - 4 then --loop
+          vials[y].loop = 0
+          loop_off(y)
+        else
+          vials[y].loop = x - 4
+          loop_on(y)
+        end
       end
     end
     if x == 10 and y == 8 then
@@ -832,13 +967,7 @@ g.key = function(x, y, z)
       params:set("delay", delay_view)
     end
     if x == 3 then
-      if y < 5 then
-        if params:get(y .. "_reverb_send") == -60.0 then
-          params:set(y .. "_reverb_send", 0)
-        else
-          params:set(y .. "_reverb_send", -60.0)
-        end
-      elseif y == 5 then
+      if y == 5 then
         for mute_rev_in = 1, 4 do
           params:set(mute_rev_in .. "_reverb_send", -60.0)
         end
@@ -862,9 +991,6 @@ g.key = function(x, y, z)
         params:set("reverb_damp", rand(30, 80) / 100)
       end
     end
-  end
-  if x == 9 and y < 5 then -- param view
-    param_view = z * y
   end
   if x == 11 and y == 8 then -- fx
     delay_view = 0 + z
@@ -890,151 +1016,30 @@ g.key = function(x, y, z)
       vials[track].steps[selected + 1] = 0
       decimal_value = 0
     end
-    if vials[track].loop < 1 then
-      vials[track].seq = generate_sequence(track)
-    elseif selected + 1 == vials[track].loop then
-      loop_on(track)
-    end
+    run_update()
   end
   if x <= 8 and y == 7 and z == 1 then -- binary input
-    if vials_utils.check_nil(binary_input) then -- if array of nil
-      binary_input[x] = 1
-      for bina = x + 1, #binary_input do
-        binary_input[bina] = 0
-      end
-    else
-      local index_1 = vials_utils.table_index(binary_input)
-      if binary_input[x] == nil or binary_input[x] == 0 then
-        if x < index_1 then
-          binary_input[x] = 1
-          for j_iter = x + 1, index_1 - 1 do
-            if binary_input[j_iter] == nil then
-              binary_input[j_iter] = 0
-            end
-          end
-        elseif x > index_1 then
-          binary_input[x] = 1
-          for k_iter = index_1 + 1, x - 1 do
-            if binary_input[k_iter] == nil then
-              binary_input[k_iter] = 0
-            end
-          end
-        end
-      elseif binary_input[x] == 1 then
-        local ind1 = vials_utils.first_index(binary_input)
-        if x == ind1 then
-          if vials_utils.tally(binary_input) == 1 then
-            make_nil(binary_input, ind1)
-            decimal_value = 0
-          else
-            binary_input[x] = nil
-            local indexx = vials_utils.first_index(binary_input)
-            for n_iter = x + 1, indexx - 1 do
-              binary_input[n_iter] = nil
-            end
-          end
-        elseif x > ind1 then
-          binary_input[x] = 0
-        end
-      end
-    end
-    local binary = vials_utils.concatenate_table(binary_input)
-    local newNumber = tonumber(binary, 2)
-    if newNumber ~= nil then
-      vials[track].steps[selected + 1] = newNumber
-    else
-      vials[track].steps[selected + 1] = 0
-    end
-    decimal_value = vials[track].steps[selected + 1]
-    if vials[track].loop < 1 then
-      vials[track].seq = generate_sequence(track)
-    elseif selected + 1 == vials[track].loop then
-      loop_on(track)
-    end
-    g:refresh()
+    handle_binary_input(x)
   end
-  if x == 13 and y == 1 and z == 1 then -- calc hold
-    calc_hold = 1 - calc_hold
+  if x == 13 and y == 1 then -- calc hold
+    calc_hold = z - calc_hold
   end
   if z == 1 and x >= 10 and x < 13 and y <= 4 then -- calculator
-    if y == 4 and (x == 10 or x == 12) then
-      return
-    end
-    local y_reducer = calculate_minus(y)
-    if calc_hold == 0 then
-      calc_input = {}
-      final_input = ""
-      if y == 4 then
-        calc_input[1] = 0
-      else
-        calc_input[1] = x - y_reducer
-      end
-    elseif calc_hold == 1 then
-      if y == 4 then
-        calc_input[#calc_input + 1] = 0
-      else
-        calc_input[#calc_input + 1] = x - y_reducer
-      end
-    end
-    final_input = final_input .. calc_input[1]
-    if #final_input == 3 then
-      calc_hold = 0
-    end
-    if tonumber(final_input) > 255 then
-      final_input = calc_input[1]
-    end
-    calc_input = {}
-    vials[track].steps[selected + 1] = tonumber(final_input)
-    decimal_value = vials[track].steps[selected + 1]
-    if vials[track].loop == 0 then
-      vials[track].seq = generate_sequence(track)
-    elseif selected + 1 == vials[track].loop then
-      loop_on(track)
-    end
-    binary_input = calc_binary_input()
+    handle_calc_input(x, y)
   end
-  if z == 1 and y == 2 then -- rotator
-    if #vials[track].seq > 0 then
-      if x == 14 then
-        vials[track].rotations = vials[track].rotations - 1
-        if vials[track].rotations == -1 then
-          vials[track].rotations = #vials[track].seq - 1
-        end
-      elseif x == 16 then
-        vials[track].rotations = vials[track].rotations + 1
-        if vials[track].rotations >= #vials[track].seq then
-          vials[track].rotations = 0
-        end
-      end
-      vials[track].seq = generate_sequence(track)
-    end
+  if x == 14 or x == 16 and z == 1 and y == 2 then -- rotator
+    rotate_track(x == 14 and "left" or "right")
   end
   if z == 1 and x == 15 and (y == 1 or y == 3) then -- track shift
-    local shift = y - 2
-    local rotated_tracks = {}
-    local t_rotations = {}
-    if shift == 1 then
-      rotated_tracks = {vials[4].steps, vials[1].steps, vials[2].steps, vials[3].steps}
-      t_rotations = {vials[4].rotations, vials[1].rotations, vials[2].rotations, vials[3].rotations}
-    else
-      rotated_tracks = {vials[2].steps, vials[3].steps, vials[4].steps, vials[1].steps}
-      t_rotations = {vials[2].rotations, vials[3].rotations, vials[4].rotations, vials[1].rotations}
-    end
-    for iter = 1, 4 do
-      vials[iter].steps = rotated_tracks[iter]
-      vials[iter].rotations = t_rotations[iter]
-      vials[iter].seq = generate_sequence(iter)
-    end
+    track_shift(y - 2)
     binary_input = calc_binary_input()
+  end
+  if x == 3 and y < 5 then -- track press
+    handle_track_press(y, z)
   end
   g:refresh()
   screen_dirty = true
   grid_dirty = true
-  if x == 1 and y < 5 then -- trigger samples
-    if z == 1 then
-      engine.trig(y - 1)
-    end
-  end
 end
 
 function init()
