@@ -671,6 +671,31 @@ function load_save(x, y)
   end
 end
 
+function grid_rotator(x, y, level)
+  g:led(x, y + 1, level)
+  g:led(x + 2, y + 1, level)
+  g:led(x + 1, y, level)
+  g:led(x + 1, y + 2, level)
+end
+
+function grid_calculator(x, y, level, low_level, active_level)
+  for col = x, x + 2 do --  calculator
+    for row = y, y + 2 do
+      g:led(col, row, level)
+    end
+    g:led(x + 1, y + 3, level)
+  end
+  g:led(x + 3, y, calc_hold == 1 and active_level or low_level) -- calc_hold
+end
+
+function grid_4x4(x, y, level)
+  for col = y, y + 3 do
+    for row = x, x + 3 do
+      g:led(row, col, level)
+    end
+  end
+end
+
 -- GRID FUNCTIONS
 function grid_redraw()
   if g == nil then
@@ -699,10 +724,8 @@ function grid_redraw()
     g:led(9, t, g_low) -- param view
     g:led(2, t, vials[t].mute == 1 and g_active or g_mid) -- mutes
     g:led(3, t, g_low) -- reverb send
-    for r = 5, 8 do
-      g:led(r, t, g_high) -- 4x4 grid
-    end
   end
+  grid_4x4(5, 1, g_high)
   if playing then
     g:led(16, 8, meta_position % 4 == 0 and g_active or g_off) -- beat indicator
   else
@@ -735,17 +758,8 @@ function grid_redraw()
       g:led(vials[y].loop + 4, y, g_active)
     end
   end
-  g:led(14, 2, g_mid) -- rotator
-  g:led(16, 2, g_mid)
-  g:led(15, 1, g_mid)
-  g:led(15, 3, g_mid)
-  for u = 1, 3 do --  calculator
-    for v = 1, 3 do
-      g:led(u + 9, v, g_high)
-    end
-    g:led(11, 4, g_high)
-  end
-  g:led(13, 1, g_active) -- calc_hold
+  grid_rotator(14, 1, g_mid)
+  grid_calculator(10, 1, g_high, g_low, g_active)
   g:refresh()
 end
 
