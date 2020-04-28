@@ -409,20 +409,19 @@ function redraw()
     screen.text("_")
     screen.font_face(number_font)
     screen.font_size(8)
-    screen_y = 32
+    screen_y = 24
     screen.move(0, screen_y)
     for row = 1, 4 do -- draw table
       for col = 1, 4 do
-        if row == track then
-          screen.level(value_color)
-        end
-        screen.text(vials[row].steps[col])
-        if row == track then
-          if col == selected + 1 then
-            screen.font_size(6)
-            screen.text("*")
-            screen.font_size(8)
-          end
+        screen.level(vials_utils.get_binary_density(vials[row].steps[col]))
+        screen.rect(screen_x, screen_y, 15, 8)
+        screen.fill()
+        if row == track and col == selected + 1 then
+          screen.level(2)
+          screen.move(screen_x + 15, screen_y + 5)
+          screen.font_size(6)
+          screen.text("|")
+          screen.font_size(8)
         end
         screen.level(color)
         screen_x = screen_x + 20
@@ -432,7 +431,7 @@ function redraw()
       screen_y = screen_y + 10
       screen.move(screen_x, screen_y)
     end
-    screen.move(80, 32)
+    screen.move(80, 24)
     screen.level(color)
     screen.font_face(word_font)
     screen.text("div ")
