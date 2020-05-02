@@ -210,14 +210,12 @@ end
 local function trigger(t, pos)
   local midi_send = (params:get("send_midi") == 1 and midi_out_device ~= nil and midi_out_channel ~= nil)
   -- trigger note
-  if vials[t].seq[pos] == 1 then
-    if rand(100) <= vials[t].prob and vials[t].mute == 0 then
-      engine.trig(t - 1)
-      if midi_send then
-        local note = params:get(t .. ":_midi_note")
-        midi_out_device:note_on(note, 100, midi_out_channel)
-        note_off_queue[t] = note
-      end
+  if vials[t].seq[pos] == 1 and rand(100) <= vials[t].prob and vials[t].mute == 0 then
+    engine.trig(t - 1)
+    if midi_send then
+      local note = params:get(t .. ":_midi_note")
+      midi_out_device:note_on(note, 100, midi_out_channel)
+      note_off_queue[t] = note
     end
   end
 end
