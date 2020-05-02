@@ -63,8 +63,6 @@
 -- binary input x1-x8, y7
 -- row below makes nil
 --
--- PRs welcome
--- thanks!
 --
 
 -- engine
@@ -74,7 +72,7 @@ local ack = require "ack/lib/ack"
 -- libraries
 local ControlSpec = require "controlspec"
 local vials_utils = include("lib/vials_utils")
-local hs = include "awake/lib/halfsecond"
+local hs = include("lib/hs")
 
 -- connection
 local g = grid.connect()
