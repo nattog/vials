@@ -1,6 +1,6 @@
 -- vials
 -- a binary rhythmbox
--- v1.0 @nattog
+-- v1.1 @nattog
 --
 -- - - - - - - - - - - - - - - - -
 -- 4x4 decimal vials
@@ -14,11 +14,12 @@
 -- e2 change track
 -- e3 change decimal
 --
--- k1 (hold) + k2 resets
--- k1 (hold) + k3 stops
--- k2 (hold) + k3 mute
--- k2 (hold) + k2 rotates binary sequence
--- k2 (hold) + e3 probability
+-- key combos, hold first
+-- k1 + k2 resets
+-- k1 + k3 stops
+-- k2 + k3 mute
+-- k2 + e2 rotates binary sequence
+-- k2 + e3 probability
 -- k3 + e3 loads pattern
 --
 -- GRID (top-left clockwise)
@@ -34,8 +35,8 @@
 -- hold right next to 3
 -- for XX, XXX
 --
--- shift sequences up or down
--- rotate sequence left or right
+-- shift seqs vertically
+-- rotate seq horizontally
 --
 -- hold to load (top) or save (bottom)
 --
@@ -62,35 +63,58 @@
 -- binary input x1-x8, y7
 -- row below makes nil
 --
--- bug reports to @nattog
--- thanks!
 --
 
+-- engine
 engine.name = "Ack"
 local ack = require "ack/lib/ack"
-local BeatClock = require "beatclock"
+
+-- libraries
 local ControlSpec = require "controlspec"
-local hs = include "awake/lib/halfsecond"
 local vials_utils = include("lib/vials_utils")
+local hs = include("lib/hs")
+Passthrough = include("lib/passthrough")
+tab = require "tabutil"
+
+-- connection
 local g = grid.connect()
-local external = false
-local clk = BeatClock.new()
-local m = midi.connect()
-local color = 3 -- screen values
+
+local midi_out_device
+local midi_out_channel
+local devices = {}
+
+-- hardware state
+local key1_hold = false
+local key2_hold = false
+local key3_hold = false
+local calc_hold = 0
+
+-- screen variables
+local SCREEN_FRAMERATE = 15
+local screen_dirty = true
+local GRID_FRAMERATE = 30
+local grid_dirty = true
+local color = 3
 local value_color = color + 5
 local number = 0
 local screen_x = 0
 local screen_y = 0
 local word_font = 1
 local number_font = 23
-local key1_hold = false -- key setup
-local key2_hold = false
-local key3_hold = false
-local calc_hold = 0
-local calc_input = {}
 local rotate_dirty = false
+local param_view = 0
+local param_sel = 1
+local delay_view = 0
+local delay_in = 1
+local reverb_view = 0
+local ls_view = 0
+
+-- sequence variables
+local vials = {}
+local playing = false
+local reset = false
 local binary_input = {nil, nil, nil, nil, nil, nil, nil}
-local vials = {} -- sequence vars
+local calc_input = {}
 local note_off_queue = {34, 35, 36, 37}
 local vi = {}
 for j = 1, 15 do
@@ -112,30 +136,28 @@ local current_vials = 1
 local selected = 0
 local decimal_value = 0
 local track = 1
-local bpm = 120
-local playing = false
-local reset = false
 local meta_position = 0
 local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
-local param_view = 0
-local param_sel = 1
-local delay_view = 0
-local delay_in = 1
-local reverb_view = 0
-local ls_view = 0
+
+-- aliases
 local mceil = math.ceil
 local rand = math.random
 
-local function start()
-  playing = true
-  just_started = true
-  clk:start()
+-- params
+chan_params = {"_vol", "_speed", "_dist", "_filter_cutoff", "_filter_res", "_filter_env_mod"}
+reverb_params = {"reverb_level", "reverb_room_size", "reverb_damp"}
+delay_params = {"delay", "delay_rate", "delay_feedback"}
+
+function start()
+  if params:string("clock_source") == "internal" then
+    clock.transport.start()
+  end
 end
 
 local function note_off()
   if params:get("send_midi") == 1 then
     for i = 1, #note_off_queue do
-      m:note_off(note_off_queue[i])
+      midi_out_device:note_off(note_off_queue[i], nil, midi_out_channel)
     end
   end
 end
@@ -149,12 +171,9 @@ local function reset_positions()
   note_off()
 end
 
-local function stop()
-  clk:stop()
-  playing = false
+function stop()
+  clock.transport.stop()
   reset_positions()
-  print("stop")
-  vials_save()
 end
 
 local function reset_vials()
@@ -172,13 +191,11 @@ local function reset_vials()
   end
   decimal_value = 0
   binary_input = {nil, nil, nil, nil, nil, nil, nil}
-  redraw()
-  grid_redraw()
+  screen_dirty = true
+  grid_dirty = true
 end
 
 local function reset_pattern()
-  clk:reset()
-  external = true
   for iter = 1, 4 do
     vials[iter].pos = 0
   end
@@ -186,21 +203,25 @@ local function reset_pattern()
   note_off()
 end
 
-m.event = function(data)
-  clk:process_midi(data)
-  if data[1] == 252 and external then
-    stop()
-  end
-end
-
 local function clock_divider(track)
   return vials[track].division
 end
 
+local function trigger(t, pos)
+  local midi_send = (params:get("send_midi") == 1 and midi_out_device ~= nil and midi_out_channel ~= nil)
+  -- trigger note
+  if vials[t].seq[pos] == 1 and rand(100) <= vials[t].prob and vials[t].mute == 0 then
+    engine.trig(t - 1)
+    if midi_send then
+      local note = params:get(t .. ":_midi_note")
+      midi_out_device:note_on(note, 100, midi_out_channel)
+      note_off_queue[t] = note
+    end
+  end
+end
+
 function count()
-  local midi_send = (params:get("send_midi") == 1)
   meta_position = (meta_position % 16) + 1
-  grid_redraw()
   note_off()
   for t = 1, 4 do
     -- check division
@@ -213,22 +234,11 @@ function count()
       end
       -- change position
       vials[t].pos = (vials[t].pos + 1)
-      local pos = vials[t].pos
-      -- trigger note
-      if vials[t].seq[pos] == 1 then
-        if rand(100) <= vials[t].prob and vials[t].mute == 0 then
-          engine.trig(t - 1)
-          if midi_send then
-            local note = params:get(t .. ":_midi_note")
-            note_off_queue[t] = note
-            m:note_on(note, 100, params:get("midi_chan"))
-          end
-        end
-      end
+      trigger(t, vials[t].pos)
     end
   end
-  -- redraw grid
-  redraw()
+  screen_dirty = true
+  grid_dirty = true
   just_started = false
 end
 
@@ -258,7 +268,8 @@ local function loop_on(t)
   end
   x = tostring(bin)
   vials[t].seq = vials_utils.split_str(x)
-  redraw()
+  screen_dirty = true
+  grid_dirty = true
 end
 
 function generate_sequence(t)
@@ -278,18 +289,20 @@ local function change_focus()
   decimal_value = vials[track].steps[selected + 1]
   calc_binary_input()
   calc_input = {}
+  screen_dirty = true
+  grid_dirty = true
 end
 
 local function loop_off(t)
   vials[t].loop = 0
   vials[t].seq = generate_sequence(t)
-  redraw()
+  screen_dirty = true
+  grid_dirty = true
 end
 
 function change_selected(inp)
   selected = (selected + inp) % 4
   change_focus()
-  grid_redraw()
 end
 
 function change_decimal(d)
@@ -302,7 +315,8 @@ function change_decimal(d)
     loop_on(track)
   end
   calc_binary_input()
-  grid_redraw()
+  screen_dirty = true
+  grid_dirty = true
 end
 
 local function make_nil(t, ind)
@@ -355,13 +369,8 @@ function redraw()
     screen.move(0, 10)
     screen.text("bpm ")
     screen.level(value_color)
-    if external then
-      screen.font_face(1)
-      screen.text("ext")
-    else
-      screen.font_face(number_font)
-      screen.text(params:get("bpm"))
-    end
+    screen.font_face(number_font)
+    screen.text(params:get("clock_tempo"))
     screen.move(80, 10)
     screen.level(color)
     screen.font_face(word_font)
@@ -380,14 +389,14 @@ function redraw()
     screen.font_size(8)
     screen_y = 32
     screen.move(0, screen_y)
-    for i = 1, 4 do
-      for j = 1, 4 do
-        if i == track then
+    for row = 1, 4 do -- draw table
+      for col = 1, 4 do
+        if row == track then
           screen.level(value_color)
         end
-        screen.text(vials[i].steps[j])
-        if i == track then
-          if j == selected + 1 then
+        screen.text(vials[row].steps[col])
+        if row == track then
+          if col == selected + 1 then
             screen.font_size(6)
             screen.text("*")
             screen.font_size(8)
@@ -489,21 +498,17 @@ end
 function key(n, z)
   if param_view == 0 then
     if n == 1 then --key 1 === START/STOP
+      key1_hold = z == 1 and true or false
       if z == 1 then
-        key1_hold = true
         if not playing then
           start()
         end
-      else
-        key1_hold = false
       end
     end
     if z == 1 and key1_hold then
+      reset_position() -- resets
       if n == 3 then -- stop
         stop()
-        reset_positions()
-      elseif n == 2 then -- reset
-        reset_positions()
       end
     end
     if n == 2 then --key 2 CHANGE SLOT
@@ -542,7 +547,8 @@ function key(n, z)
       param_sel = n - 1
     end
   end
-  redraw()
+  screen_dirty = true
+  grid_dirty = true
 end
 
 function enc(n, d)
@@ -561,50 +567,26 @@ function enc(n, d)
         load_save(current_vials, 1)
       end
     end
-    if n == 1 then -- change bpm
-      params:delta("bpm", d)
+    if n == 1 and params:string("clock_source") == "internal" then -- change internal bpm
+      params:delta("clock_tempo", d)
     end
     if n == 2 and key2_hold then -- change division
       local div_amt = vials[track].division
       vials[track].division = util.clamp(div_amt + d, 1, 8)
     end
-    grid_redraw()
   elseif delay_view > 0 then
-    if n == 1 then
-      params:delta("delay", d)
-    elseif n == 2 then
-      params:delta("delay_rate", d)
-    elseif n == 3 then
-      params:delta("delay_feedback", d)
-    end
+    params:delta(delay_params[n], d)
   elseif reverb_view > 0 then
-    if n == 1 then
-      params:delta("reverb_level", d)
-    elseif n == 2 then
-      params:delta("reverb_room_size", d)
-    elseif n == 3 then
-      params:delta("reverb_damp", d)
-    end
+    params:delta(reverb_params[n], d)
   elseif param_view > 0 then
     if param_sel == 1 then
-      if n == 1 then
-        params:delta(param_view .. "_vol", d)
-      elseif n == 2 then
-        params:delta(param_view .. "_speed", d)
-      elseif n == 3 then
-        params:delta(param_view .. "_dist", d)
-      end
+      params:delta(param_view .. chan_params[n], d)
     else
-      if n == 1 then
-        params:delta(param_view .. "_filter_cutoff", d)
-      elseif n == 2 then
-        params:delta(param_view .. "_filter_res", d)
-      elseif n == 3 then
-        params:delta(param_view .. "_filter_env_mod", d)
-      end
+      params:delta(param_view .. chan_params[n + 3], d)
     end
   end
-  redraw()
+  screen_dirty = true
+  grid_dirty = true
 end
 
 function vials_save() -- save seq data
@@ -623,7 +605,7 @@ function vials_save() -- save seq data
       io.write(vi[x][y].loop .. "\n")
     end
   end
-  io.write(params:get("bpm") .. "\n")
+  io.write(params:get("clock_tempo") .. "\n")
   io.close(file)
 end
 
@@ -645,7 +627,7 @@ function vials_load() -- load seq data
           vi[x][y].loop = tonumber(io.read()) or 0
         end
       end
-      params:set("bpm", tonumber(io.read()) or 100)
+      params:set("clock_tempo", tonumber(io.read()) or 100)
     else
       print("invalid data file")
     end
@@ -665,8 +647,8 @@ function load_save(x, y)
     for i = 1, 4 do
       vials[i].seq = generate_sequence(i)
     end
-    redraw()
-    grid_redraw()
+    screen_dirty = true
+    grid_dirty = true
   else -- save
     vi[x] = vials_utils.deepcopy(vials)
     print("saved: " .. x)
@@ -860,14 +842,14 @@ g.key = function(x, y, z)
   if x == 11 and y == 8 then -- fx
     delay_view = 0 + z
     params:set("delay", delay_view)
-    redraw()
+    screen_dirty = true
   end
   if x == 14 and y == 7 then
     reverb_view = 0 + z
   end
   if x == 16 and y == 5 then
     ls_view = 0 + z
-    grid_redraw()
+    grid_dirty = true
   end
   if x <= 8 and y == 8 and z == 1 then -- make a bit nil
     for iter = x, #binary_input do
@@ -1019,8 +1001,8 @@ g.key = function(x, y, z)
     calc_binary_input()
   end
   g:refresh()
-  grid_redraw()
-  redraw()
+  screen_dirty = true
+  grid_dirty = true
   if x == 1 and y < 5 then -- trigger samples
     if z == 1 then
       engine.trig(y - 1)
@@ -1029,41 +1011,107 @@ g.key = function(x, y, z)
 end
 
 function init()
-  clk.on_step = count -- clock setup
-  clk.on_select_internal = function()
-    clk:start()
-    external = false
-  end
-  clk.on_select_external = reset_pattern
-  external = false
-  clk:add_clock_params() -- params
-  params:add_number("midi_chan", "midi chan", 1, 16, 1)
-  params:add_option("send_midi", "send midi", {"yes", "no"}, 1)
-  params:add_separator()
-  params:add {type = "trigger", id = "Save", name = "save pattern", action = menu_save}
-  params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
-  params:add_separator()
+  params:add_group("ENGINE", 99)
   for channel = 1, 4 do
-    params:add_number(channel .. ":_midi_note", channel .. ": midi note", 1, 127, 32 + channel)
     ack.add_channel_params(channel)
     params:add_separator()
   end
   ack.add_effects_params()
+
+  params:add_separator()
+  for id, device in pairs(midi.vports) do
+    devices[id] = device.name
+  end
+  params:add_group("MIDI", 8)
+  params:add_option("send_midi", "send midi", {"yes", "no"}, 2)
+
+  midi_out_device = midi.connect(1)
+  midi_out_device.event = function()
+  end
+
+  params:add {
+    type = "option",
+    id = "midi_out_device",
+    name = "midi out device",
+    options = devices,
+    action = function(value)
+      midi_out_device.event = nil
+      midi_out_device = midi.connect(value)
+    end
+  }
+  params:add {
+    type = "number",
+    id = "midi_out_channel",
+    name = "midi out channel",
+    min = 1,
+    max = 16,
+    default = 1,
+    action = function(value)
+      midi_out_channel = value
+    end
+  }
+  params:bang()
+  params:add_separator()
+  for channel = 1, 4 do
+    params:add_number(channel .. ":_midi_note", channel .. ": midi note", 1, 127, 32 + channel)
+  end
+  params:add_group("HALFSECOND", 5)
+
   hs.init() -- halfsecond
   params:set("delay", 0)
+
+  Passthrough.init()
+  params:add_separator()
+  params:add {type = "trigger", id = "Save", name = "save pattern", action = menu_save}
+  params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
   vials_load()
   vials = vials_utils.deepcopy(vi[current_vials])
   for init_t = 1, 4 do
     vials[init_t].seq = generate_sequence(init_t)
-    track = track + 1
   end
   track = 1
   change_focus()
-  grid_redraw()
+
+  local screen_redraw_metro = metro.init()
+  screen_redraw_metro.event = function()
+    if screen_dirty then
+      redraw()
+      screen_dirty = false
+    end
+  end
+
+  local grid_redraw_metro = metro.init()
+  grid_redraw_metro.event = function()
+    if grid_dirty and g.device then
+      grid_dirty = false
+      grid_redraw()
+    end
+  end
+
+  screen_redraw_metro:start(1 / SCREEN_FRAMERATE)
+  grid_redraw_metro:start(1 / GRID_FRAMERATE)
+
+  -- CLOCK coroutines
+  function pulse()
+    while true do
+      clock.sync(1 / 4)
+      count()
+    end
+  end
+
+  function clock.transport.start()
+    id = clock.run(pulse)
+    playing = true
+  end
+
+  function clock.transport.stop()
+    clock.cancel(id)
+    playing = false
+  end
 end
 
 function cleanup()
-  clk:stop()
+  playing = false
   note_off()
   vials_save()
 end
