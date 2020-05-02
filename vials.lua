@@ -673,16 +673,6 @@ function grid_rotator(x, y, level)
   g:led(x + 1, y + 2, level)
 end
 
-function grid_calculator(x, y, level, low_level, active_level)
-  for col = x, x + 2 do --  calculator
-    for row = y, y + 2 do
-      g:led(col, row, level)
-    end
-    g:led(x + 1, y + 3, level)
-  end
-  g:led(x + 3, y, calc_hold == 1 and active_level or low_level) -- calc_hold
-end
-
 function handle_track_press(y, z)
   if paraming.state then
     param_view = z * y
@@ -749,11 +739,13 @@ function grid_redraw()
   else
     g:all(0)
     g:led(16, 5, g_low)
-    for i = 1, 8 do -- binary pattern leds
-      if binary_input[i] ~= nil and i <= #binary_input then
-        g:led(i, 7, binary_input[i] == 1 and g_active or g_high)
-      else
-        g:led(i, 7, g_low)
+    for tr = 1, 4 do
+      for i = 1, 8 do -- binary pattern leds
+        if binary_input[i] ~= nil and i <= #binary_input then
+          g:led(9 + tr, 0 + i, binary_input[i] == 1 and g_active or g_high)
+        else
+          g:led(9 + tr, 0 + i, 0)
+        end
       end
     end
     g:led(looping.x, looping.y, looping.state and g_high or g_low)
@@ -770,15 +762,14 @@ function grid_redraw()
       g:led(16, 8, g_mid)
     end
     g:led(16, 7, g_mid) -- reset
-    g:led(11, 8, delay_view == 1 and g_active or g_low) -- delay
-    g:led(10, 8, delay_in == 1 and g_active or g_low)
-    g:led(12, 8, g_low)
-    g:led(13, 8, g_low)
-    for i = 10, 14 do -- reverb
-      g:led(i, 7, g_low)
-    end
+    -- g:led(11, 8, delay_view == 1 and g_active or g_low) -- delay
+    -- g:led(10, 8, delay_in == 1 and g_active or g_low)
+    -- g:led(12, 8, g_low)
+    -- g:led(13, 8, g_low)
+    -- for i = 10, 14 do -- reverb
+    --   g:led(i, 7, g_low)
+    -- end
     grid_rotator(14, 1, g_mid)
-    grid_calculator(10, 1, g_high, g_low, g_active)
     g:refresh()
   end
 end
@@ -841,83 +832,45 @@ function new_pos_selector()
   binary_input = vials_utils.split_str(vials_utils.dec_to_bin(decimal_value))
 end
 
-function handle_binary_input(x)
-  if vials_utils.check_nil(binary_input) then -- if array of nil
-    binary_input[x] = 1
-    for i = x + 1, #binary_input do
-      binary_input[i] = 0 -- fill rest of input with 0s
-    end
-  else
-    local index_1 = vials_utils.table_index(binary_input)
-    if binary_input[x] == 1 then
-      local first_index = vials_utils.first_index(binary_input)
-      if x == first_index then
-        if vials_utils.tally(binary_input) == 1 then
-          make_nil(binary_input, first_index)
-          decimal_value = 0
-        else
-          binary_input[x] = nil
-          for n = x + 1, vials_utils.first_index(binary_input) - 1 do
-            binary_input[n] = nil
-          end
-        end
-      elseif x > first_index then
-        binary_input[x] = 0
-      end
-    else
-      if x ~= index_1 then
-        binary_input[x] = 1
-        for j = x + 1, index_1 - 1 do
-          binary_input[j] = binary_input[j] == nil and 0
-        end
-      end
-    end
-  end
-  local binary = vials_utils.concatenate_table(binary_input)
-  local newNumber = tonumber(binary, 2)
-  vials[track].steps[selected + 1] = newNumber ~= nil and newNumber or 0
-  decimal_value = vials[track].steps[selected + 1]
-  run_update()
-  g:refresh()
-end
-
-function handle_calc_input(x, y)
-  if y == 4 and (x == 10 or x == 12) then
-    return
-  end
-  local y_reducer = calculate_minus(y)
-  if calc_hold == 0 then
-    calc_input = {}
-    final_input = ""
-    if y == 4 then
-      calc_input[1] = 0
-    else
-      calc_input[1] = x - y_reducer
-    end
-  elseif calc_hold == 1 then
-    if y == 4 then
-      calc_input[#calc_input + 1] = 0
-    else
-      calc_input[#calc_input + 1] = x - y_reducer
-    end
-  end
-  final_input = final_input .. calc_input[1]
-  if #final_input == 3 then
-    calc_hold = 0
-  end
-  if tonumber(final_input) > 255 then
-    final_input = calc_input[1]
-  end
-  calc_input = {}
-  vials[track].steps[selected + 1] = tonumber(final_input)
-  decimal_value = vials[track].steps[selected + 1]
-  if vials[track].loop == 0 then
-    vials[track].seq = generate_sequence(track)
-  elseif selected + 1 == vials[track].loop then
-    loop_on(track)
-  end
-  binary_input = calc_binary_input()
-end
+-- function handle_binary_input(x)
+--   if vials_utils.check_nil(binary_input) then -- if array of nil
+--     binary_input[x] = 1
+--     for i = x + 1, #binary_input do
+--       binary_input[i] = 0 -- fill rest of input with 0s
+--     end
+--   else
+--     local index_1 = vials_utils.table_index(binary_input)
+--     if binary_input[x] == 1 then
+--       local first_index = vials_utils.first_index(binary_input)
+--       if x == first_index then
+--         if vials_utils.tally(binary_input) == 1 then
+--           make_nil(binary_input, first_index)
+--           decimal_value = 0
+--         else
+--           binary_input[x] = nil
+--           for n = x + 1, vials_utils.first_index(binary_input) - 1 do
+--             binary_input[n] = nil
+--           end
+--         end
+--       elseif x > first_index then
+--         binary_input[x] = 0
+--       end
+--     else
+--       if x ~= index_1 then
+--         binary_input[x] = 1
+--         for j = x + 1, index_1 - 1 do
+--           binary_input[j] = binary_input[j] == nil and 0
+--         end
+--       end
+--     end
+--   end
+--   local binary = vials_utils.concatenate_table(binary_input)
+--   local newNumber = tonumber(binary, 2)
+--   vials[track].steps[selected + 1] = newNumber ~= nil and newNumber or 0
+--   decimal_value = vials[track].steps[selected + 1]
+--   run_update()
+--   g:refresh()
+-- end
 
 g.key = function(x, y, z)
   if loadsave_view == 1 and x < 16 and z == 1 then
@@ -953,80 +906,74 @@ g.key = function(x, y, z)
         end
       end
     end
-    if x == 10 and y == 8 then
-      delay_in = 1 - delay_in
-      audio.level_eng_cut(delay_in)
-    end
-    if x == 12 and y == 8 then
-      params:set("delay_rate", (rand(200)) / 100)
-      params:set("delay_feedback", (rand(100)) / 100)
-    end
-    if x == 13 and y == 8 then
-      delay_view = 0
-      params:set("delay", delay_view)
-    end
-    if x == 3 then
-      if y == 5 then
-        for mute_rev_in = 1, 4 do
-          params:set(mute_rev_in .. "_reverb_send", -60.0)
-        end
-      end
-    end
-    if y == 7 then
-      if x == 10 then -- reverb level
-        if params:get("reverb_level") > -20.0 then
-          params:set("reverb_level", -80.0)
-        else
-          params:set("reverb_level", -10.0)
-        end
-      elseif x == 11 then -- short spaces
-        params:set("reverb_room_size", rand(25) / 100)
-        params:set("reverb_damp", rand(75, 100) / 100)
-      elseif x == 12 then -- mid spaces
-        params:set("reverb_room_size", rand(25, 75) / 100)
-        params:set("reverb_damp", rand(40, 80) / 100)
-      elseif x == 13 then -- long spaces
-        params:set("reverb_room_size", rand(75, 100) / 100)
-        params:set("reverb_damp", rand(30, 80) / 100)
-      end
-    end
+  --   if x == 10 and y == 8 then
+  --     delay_in = 1 - delay_in
+  --     audio.level_eng_cut(delay_in)
+  --   end
+  --   if x == 12 and y == 8 then
+  --     params:set("delay_rate", (rand(200)) / 100)
+  --     params:set("delay_feedback", (rand(100)) / 100)
+  --   end
+  --   if x == 13 and y == 8 then
+  --     delay_view = 0
+  --     params:set("delay", delay_view)
+  --   end
+  --   if x == 3 then
+  --     if y == 5 then
+  --       for mute_rev_in = 1, 4 do
+  --         params:set(mute_rev_in .. "_reverb_send", -60.0)
+  --       end
+  --     end
+  --   end
+  --   if y == 7 then
+  --     if x == 10 then -- reverb level
+  --       if params:get("reverb_level") > -20.0 then
+  --         params:set("reverb_level", -80.0)
+  --       else
+  --         params:set("reverb_level", -10.0)
+  --       end
+  --     elseif x == 11 then -- short spaces
+  --       params:set("reverb_room_size", rand(25) / 100)
+  --       params:set("reverb_damp", rand(75, 100) / 100)
+  --     elseif x == 12 then -- mid spaces
+  --       params:set("reverb_room_size", rand(25, 75) / 100)
+  --       params:set("reverb_damp", rand(40, 80) / 100)
+  --     elseif x == 13 then -- long spaces
+  --       params:set("reverb_room_size", rand(75, 100) / 100)
+  --       params:set("reverb_damp", rand(30, 80) / 100)
+  --     end
+  --   end
   end
-  if x == 11 and y == 8 then -- fx
-    delay_view = 0 + z
-    params:set("delay", delay_view)
-    screen_dirty = true
-  end
-  if x == 14 and y == 7 then
-    reverb_view = 0 + z
-  end
+  -- if x == 11 and y == 8 then -- fx
+  --   delay_view = 0 + z
+  --   params:set("delay", delay_view)
+  --   screen_dirty = true
+  -- end
+  -- if x == 14 and y == 7 then
+  --   reverb_view = 0 + z
+  -- end
   if x == 16 and y == 5 then
     loadsave_view = 0 + z
     grid_dirty = true
   end
-  if x <= 8 and y == 8 and z == 1 then -- make a bit nil
-    for iter = x, #binary_input do
-      binary_input[iter] = nil
-    end
-    if not vials_utils.check_nil(binary_input) then
-      binary = vials_utils.concatenate_table(binary_input)
-      vials[track].steps[selected + 1] = tonumber(binary, 2)
-      decimal_value = vials[track].steps[selected + 1]
-    else
-      vials[track].steps[selected + 1] = 0
-      decimal_value = 0
-    end
-    run_update()
-  end
-  if x <= 8 and y == 7 and z == 1 then -- binary input
-    handle_binary_input(x)
-  end
-  if x == 13 and y == 1 then -- calc hold
-    calc_hold = z - calc_hold
-  end
-  if z == 1 and x >= 10 and x < 13 and y <= 4 then -- calculator
-    handle_calc_input(x, y)
-  end
-  if x == 14 or x == 16 and z == 1 and y == 2 then -- rotator
+  -- if x <= 8 and y == 8 and z == 1 then -- make a bit nil
+  --   for iter = x, #binary_input do
+  --     binary_input[iter] = nil
+  --   end
+  --   if not vials_utils.check_nil(binary_input) then
+  --     binary = vials_utils.concatenate_table(binary_input)
+  --     vials[track].steps[selected + 1] = tonumber(binary, 2)
+  --     decimal_value = vials[track].steps[selected + 1]
+  --   else
+  --     vials[track].steps[selected + 1] = 0
+  --     decimal_value = 0
+  --   end
+  --   run_update()
+  -- end
+  -- if x <= 8 and y == 7 and z == 1 then -- binary input
+  --   handle_binary_input(x)
+  -- end
+  if (x == 14 or x == 16) and (z == 1 and y == 2) then -- rotator
     rotate_track(x == 14 and "left" or "right")
   end
   if z == 1 and x == 15 and (y == 1 or y == 3) then -- track shift

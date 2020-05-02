@@ -26,8 +26,8 @@ function vials_utils.split(s, delimiter)
   return result
 end
 
-function vials_utils.round(what, precision)
-  return math.floor(what * power(10, precision) + 0.5) / power(10, precision)
+function vials_utils.count(base, pattern)
+  return select(2, string.gsub(base, pattern, ""))
 end
 
 function vials_utils.get_binary_density(decimal)
@@ -35,8 +35,12 @@ function vials_utils.get_binary_density(decimal)
     return 0
   end
   binarystring = tostring(vials_utils.dec_to_bin(decimal)) or ""
-  one_count = count(binarystring, 1)
+  one_count = vials_utils.count(binarystring, 1)
   return math.floor((one_count / #binarystring) * 16)
+end
+
+function vials_utils.round(what, precision)
+  return math.floor(what * power(10, precision) + 0.5) / power(10, precision)
 end
 
 function vials_utils.rotate(m, dir)
