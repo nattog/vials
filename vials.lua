@@ -74,13 +74,14 @@ local ControlSpec = require "controlspec"
 local vials_utils = include("lib/vials_utils")
 local hs = include("lib/hs")
 Passthrough = include("lib/passthrough")
+tab = require "tabutil"
 
 -- connection
 local g = grid.connect()
-local m = midi.connect()
 
--- clock
-local clock_id = nil
+local midi_out_device
+local midi_out_channel
+local devices = {}
 
 -- hardware state
 local key1_hold = false
@@ -147,30 +148,16 @@ chan_params = {"_vol", "_speed", "_dist", "_filter_cutoff", "_filter_res", "_fil
 reverb_params = {"reverb_level", "reverb_room_size", "reverb_damp"}
 delay_params = {"delay", "delay_rate", "delay_feedback"}
 
-function pulse()
-  while playing do
-    clock.sync(1 / 4)
-    count()
-  end
-end
-
-function clock.transport.start()
-  clock_id = clock.run(pulse)
-end
-
-function clock.transport.stop()
-  clock.cancel(clock_id)
-end
-
 function start()
-  playing = true
-  clock.transport.start()
+  if params:string("clock_source") == "internal" then
+    clock.transport.start()
+  end
 end
 
 local function note_off()
   if params:get("send_midi") == 1 then
     for i = 1, #note_off_queue do
-      m:note_off(note_off_queue[i])
+      midi_out_device:note_off(note_off_queue[i], nil, midi_out_channel)
     end
   end
 end
@@ -185,10 +172,8 @@ local function reset_positions()
 end
 
 function stop()
-  playing = false
   clock.transport.stop()
   reset_positions()
-  vials_save()
 end
 
 local function reset_vials()
@@ -222,8 +207,22 @@ local function clock_divider(track)
   return vials[track].division
 end
 
+local function trigger(t, pos)
+  local midi_send = (params:get("send_midi") == 1 and midi_out_device ~= nil and midi_out_channel ~= nil)
+  -- trigger note
+  if vials[t].seq[pos] == 1 then
+    if rand(100) <= vials[t].prob and vials[t].mute == 0 then
+      engine.trig(t - 1)
+      if midi_send then
+        local note = params:get(t .. ":_midi_note")
+        midi_out_device:note_on(note, 100, midi_out_channel)
+        note_off_queue[t] = note
+      end
+    end
+  end
+end
+
 function count()
-  local midi_send = (params:get("send_midi") == 1)
   meta_position = (meta_position % 16) + 1
   note_off()
   for t = 1, 4 do
@@ -237,18 +236,7 @@ function count()
       end
       -- change position
       vials[t].pos = (vials[t].pos + 1)
-      local pos = vials[t].pos
-      -- trigger note
-      if vials[t].seq[pos] == 1 then
-        if rand(100) <= vials[t].prob and vials[t].mute == 0 then
-          engine.trig(t - 1)
-          if midi_send then
-            local note = params:get(t .. ":_midi_note")
-            note_off_queue[t] = note
-            m:note_on(note, 100, params:get("midi_chan"))
-          end
-        end
-      end
+      trigger(t, vials[t].pos)
     end
   end
   screen_dirty = true
@@ -1025,22 +1013,59 @@ g.key = function(x, y, z)
 end
 
 function init()
-  Passthrough.init()
-  params:bang()
-  params:add_option("send_midi", "send midi", {"yes", "no"}, 1)
-  params:add_number("midi_chan", "midi chan", 1, 16, 1)
-  params:add_separator()
-  params:add {type = "trigger", id = "Save", name = "save pattern", action = menu_save}
-  params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
-  params:add_separator()
+  params:add_group("ENGINE", 99)
   for channel = 1, 4 do
-    params:add_number(channel .. ":_midi_note", channel .. ": midi note", 1, 127, 32 + channel)
     ack.add_channel_params(channel)
     params:add_separator()
   end
   ack.add_effects_params()
+
+  params:add_separator()
+  for id, device in pairs(midi.vports) do
+    devices[id] = device.name
+  end
+  params:add_group("MIDI", 8)
+  params:add_option("send_midi", "send midi", {"yes", "no"}, 2)
+
+  midi_out_device = midi.connect(1)
+  midi_out_device.event = function()
+  end
+
+  params:add {
+    type = "option",
+    id = "midi_out_device",
+    name = "midi out device",
+    options = devices,
+    action = function(value)
+      midi_out_device.event = nil
+      midi_out_device = midi.connect(value)
+    end
+  }
+  params:add {
+    type = "number",
+    id = "midi_out_channel",
+    name = "midi out channel",
+    min = 1,
+    max = 16,
+    default = 1,
+    action = function(value)
+      midi_out_channel = value
+    end
+  }
+  params:bang()
+  params:add_separator()
+  for channel = 1, 4 do
+    params:add_number(channel .. ":_midi_note", channel .. ": midi note", 1, 127, 32 + channel)
+  end
+  params:add_group("HALFSECOND", 5)
+
   hs.init() -- halfsecond
   params:set("delay", 0)
+
+  Passthrough.init()
+  params:add_separator()
+  params:add {type = "trigger", id = "Save", name = "save pattern", action = menu_save}
+  params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
   vials_load()
   vials = vials_utils.deepcopy(vi[current_vials])
   for init_t = 1, 4 do
@@ -1067,6 +1092,24 @@ function init()
 
   screen_redraw_metro:start(1 / SCREEN_FRAMERATE)
   grid_redraw_metro:start(1 / GRID_FRAMERATE)
+
+  -- CLOCK coroutines
+  function pulse()
+    while true do
+      clock.sync(1 / 4)
+      count()
+    end
+  end
+
+  function clock.transport.start()
+    id = clock.run(pulse)
+    playing = true
+  end
+
+  function clock.transport.stop()
+    clock.cancel(id)
+    playing = false
+  end
 end
 
 function cleanup()
