@@ -73,6 +73,7 @@ local ack = require "ack/lib/ack"
 local ControlSpec = require "controlspec"
 local vials_utils = include("lib/vials_utils")
 local hs = include("lib/hs")
+Passthrough = include("lib/passthrough")
 
 -- connection
 local g = grid.connect()
@@ -1024,6 +1025,8 @@ g.key = function(x, y, z)
 end
 
 function init()
+  Passthrough.init()
+  params:bang()
   params:add_option("send_midi", "send midi", {"yes", "no"}, 1)
   params:add_number("midi_chan", "midi chan", 1, 16, 1)
   params:add_separator()
