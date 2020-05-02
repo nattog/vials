@@ -18,7 +18,7 @@
 -- k1 + k2 resets
 -- k1 + k3 stops
 -- k2 + k3 mute
--- k2 + k2 rotates binary sequence
+-- k2 + e2 rotates binary sequence
 -- k2 + e3 probability
 -- k3 + e3 loads pattern
 --
@@ -35,8 +35,8 @@
 -- hold right next to 3
 -- for XX, XXX
 --
--- shift sequences up or down
--- rotate sequence left or right
+-- shift seqs vertically
+-- rotate seq horizontally
 --
 -- hold to load (top) or save (bottom)
 --
@@ -80,7 +80,7 @@ local g = grid.connect()
 local m = midi.connect()
 
 -- clock
-local clock_id
+local clock_id = nil
 
 -- hardware state
 local key1_hold = false
@@ -581,7 +581,7 @@ function enc(n, d)
         load_save(current_vials, 1)
       end
     end
-    if n == 1 then -- change bpm
+    if n == 1 and params:string("clock_source") == "internal" then -- change internal bpm
       params:delta("clock_tempo", d)
     end
     if n == 2 and key2_hold then -- change division
