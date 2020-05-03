@@ -821,13 +821,12 @@ function grid_redraw()
   if g == nil then
     return
   end
+  g:all(0)
   if loadsave_view == 1 then
-    g:all(0)
     for x = 1, 15 do
       g:led(x, 1, g_low)
       g:led(x, 8, g_low)
     end
-    g:refresh()
   else
     g:all(0)
     g:led(16, 5, g_low)
@@ -862,8 +861,8 @@ function grid_redraw()
     --   g:led(i, 7, g_low)
     -- end
     grid_rotator(14, 1, g_mid)
-    g:refresh()
   end
+  g:refresh()
 end
 
 function calculate_minus(y)
@@ -969,7 +968,10 @@ g.key = function(x, y, z)
     load_save(x, y)
     return
   end
-
+  if x == 16 and y == 5 then
+    loadsave_view = 1 - loadsave_view
+    grid_dirty = true
+  end
   if z == 1 then
     if x == 1 and y <= 5 then
       handle_action_press(y)
