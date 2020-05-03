@@ -506,7 +506,7 @@ function key(n, z)
       end
     end
     if z == 1 and key1_hold then
-      reset_position() -- resets
+      reset_positions() -- resets
       if n == 3 then -- stop
         stop()
       end
