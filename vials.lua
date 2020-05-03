@@ -506,7 +506,7 @@ function key(n, z)
       end
     end
     if z == 1 and key1_hold then
-      reset_position() -- resets
+      reset_positions() -- resets
       if n == 3 then -- stop
         stop()
       end
@@ -660,79 +660,77 @@ function grid_redraw()
   if g == nil then
     return
   end
+  g:all(0)
   if ls_view == 1 then
-    g:all(0)
     for x = 1, 15 do
       g:led(x, 1, 3)
       g:led(x, 8, 3)
     end
-    return
   else
-    g:all(0)
     g:led(16, 5, 3)
-  end
-  for iter = 1, 8 do -- binary pattern leds
-    if binary_input[iter] ~= nil and iter <= #binary_input then
-      g:led(iter, 7, 7 + 7 * binary_input[iter])
+    for iter = 1, 8 do -- binary pattern leds
+      if binary_input[iter] ~= nil and iter <= #binary_input then
+        g:led(iter, 7, 7 + 7 * binary_input[iter])
+      else
+        g:led(iter, 7, 2)
+      end
+    end
+    for t = 1, 4 do
+      g:led(1, t, 7) -- sample triggers
+      g:led(9, t, 3) -- param view
+      g:led(2, t, 5 + vials[t].mute * 10) -- mutes
+      g:led(3, t, 3) -- reverb send
+      for r = 5, 8 do
+        g:led(r, t, 7) -- 4x4 grid
+      end
+    end
+    if meta_position % 4 == 0 then -- clock indicator
+      g:led(16, 8, 15)
     else
-      g:led(iter, 7, 2)
+      g:led(16, 8, 1)
     end
-  end
-  for t = 1, 4 do
-    g:led(1, t, 7) -- sample triggers
-    g:led(9, t, 3) -- param view
-    g:led(2, t, 5 + vials[t].mute * 10) -- mutes
-    g:led(3, t, 3) -- reverb send
-    for r = 5, 8 do
-      g:led(r, t, 7) -- 4x4 grid
+    if not playing then
+      g:led(16, 8, 5)
     end
-  end
-  if meta_position % 4 == 0 then -- clock indicator
-    g:led(16, 8, 15)
-  else
-    g:led(16, 8, 1)
-  end
-  if not playing then
-    g:led(16, 8, 5)
-  end
-  g:led(16, 7, 5) -- reset
-  g:led(11, 8, (3 + delay_view * 10)) -- delay
-  g:led(10, 8, (3 + delay_in * 10))
-  g:led(12, 8, 3)
-  g:led(13, 8, 3)
-  for i = 10, 14 do -- reverb
-    g:led(i, 7, 3)
-  end
-  for tr = 1, 4 do -- 4x4 location
-    if tr == track then
-      g:led(4, tr, 5)
-    else
-      g:led(4, tr, 0)
+    g:led(16, 7, 5) -- reset
+    g:led(11, 8, (3 + delay_view * 10)) -- delay
+    g:led(10, 8, (3 + delay_in * 10))
+    g:led(12, 8, 3)
+    g:led(13, 8, 3)
+    for i = 10, 14 do -- reverb
+      g:led(i, 7, 3)
     end
-  end
-  for sel = 0, 3 do
-    if sel == selected then
-      g:led(sel + 5, 5, 5)
-    else
-      g:led(sel + 5, 5, 0)
+    for tr = 1, 4 do -- 4x4 location
+      if tr == track then
+        g:led(4, tr, 5)
+      else
+        g:led(4, tr, 0)
+      end
     end
-  end
-  for y = 1, 4 do -- loop
-    if vials[y].loop > 0 then
-      g:led(vials[y].loop + 4, y, 15)
+    for sel = 0, 3 do
+      if sel == selected then
+        g:led(sel + 5, 5, 5)
+      else
+        g:led(sel + 5, 5, 0)
+      end
     end
-  end
-  g:led(14, 2, 5) -- rotator
-  g:led(16, 2, 5)
-  g:led(15, 1, 5)
-  g:led(15, 3, 5)
-  for u = 1, 3 do --  calculator
-    for v = 1, 3 do
-      g:led(u + 9, v, 7)
+    for y = 1, 4 do -- loop
+      if vials[y].loop > 0 then
+        g:led(vials[y].loop + 4, y, 15)
+      end
     end
-    g:led(11, 4, 7)
+    g:led(14, 2, 5) -- rotator
+    g:led(16, 2, 5)
+    g:led(15, 1, 5)
+    g:led(15, 3, 5)
+    for u = 1, 3 do --  calculator
+      for v = 1, 3 do
+        g:led(u + 9, v, 7)
+      end
+      g:led(11, 4, 7)
+    end
+    g:led(13, 1, 2 + calc_hold * 10) -- calc_hold
   end
-  g:led(13, 1, 2 + calc_hold * 10) -- calc_hold
   g:refresh()
 end
 
@@ -759,8 +757,8 @@ g.key = function(x, y, z)
   end
   if x == 16 and y == 5 then
     ls_view = 1 - ls_view
+    grid_dirty = true
   end
-
   if z == 1 then
     if x == 2 and y < 5 then -- mute track
       vials[y].mute = 1 - vials[y].mute
@@ -846,10 +844,6 @@ g.key = function(x, y, z)
   end
   if x == 14 and y == 7 then
     reverb_view = 0 + z
-  end
-  if x == 16 and y == 5 then
-    ls_view = 0 + z
-    grid_dirty = true
   end
   if x <= 8 and y == 8 and z == 1 then -- make a bit nil
     for iter = x, #binary_input do
