@@ -1153,10 +1153,9 @@ function init()
   params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
   vials_load()
   vials = utils.deepcopy(vi[current_vials])
-  for init_t = 1, 4 do
-    vials[init_t].seq = generate_sequence(init_t)
+  for t = 1, 4 do
+    vials[t].seq = generate_sequence(t)
   end
-  track_ix = 1
   change_focus()
 
   local screen_redraw_metro = metro.init()
