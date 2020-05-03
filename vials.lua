@@ -163,7 +163,7 @@ end
 
 -- libraries
 local ControlSpec = require "controlspec"
-local vials_utils = include("lib/vials_utils")
+local utils = include("lib/utils")
 local hs = include("lib/hs")
 Passthrough = include("lib/passthrough")
 tab = require "tabutil"
@@ -221,7 +221,7 @@ local reset = false
 local binary_input = {nil, nil, nil, nil, nil, nil, nil}
 local calc_input = {}
 local note_off_queue = {34, 35, 36, 37}
-local vi = {}
+vi = {}
 for j = 1, 15 do
   vi[j] = {}
   for v = 1, 4 do
@@ -230,6 +230,12 @@ for j = 1, 15 do
       prob = 100,
       mute = 0,
       seq = {0},
+      units = {
+        {steps = {0}, accent = {0}, dec = 0},
+        {steps = {0}, accent = {0}, dec = 0},
+        {steps = {0}, accent = {0}, dec = 0},
+        {steps = {0}, accent = {0}, dec = 0}
+      },
       steps = {0, 0, 0, 0},
       rotations = 0,
       division = 1,
@@ -238,9 +244,9 @@ for j = 1, 15 do
   end
 end
 local current_vials = 1
-local selected = 0
+local unit_ix = 0
 local decimal_value = 0
-local track = 1
+local track_ix = 1
 local meta_position = 0
 local div_options = {1, 2, 3, 4, 6, 8, 12, 16}
 
@@ -288,6 +294,12 @@ function reset_vials()
       prob = 100,
       mute = 0,
       seq = {0},
+      units = {
+        {steps = {0}, accent = {0}, dec = 0},
+        {steps = {0}, accent = {0}, dec = 0},
+        {steps = {0}, accent = {0}, dec = 0},
+        {steps = {0}, accent = {0}, dec = 0}
+      },
       steps = {0, 0, 0, 0},
       rotations = 0,
       division = 1,
@@ -351,25 +363,25 @@ function binary_string(track)
   local str = ""
   for step = 1, 4 do
     if vials[track].steps[step] ~= nil and vials[track].steps[step] ~= 0 then
-      str = str .. vials_utils.dec_to_bin(vials[track].steps[step])
+      str = str .. utils.dec_to_bin(vials[track].steps[step])
     end
   end
   return str
 end
 
 function calc_binary_input()
-  return vials_utils.split_str(tostring(vials_utils.dec_to_bin(decimal_value)))
+  return utils.split_str(tostring(utils.dec_to_bin(decimal_value)))
 end
 
 function loop_on(t)
   local x
   local track = vials[t]
-  bin = vials_utils.dec_to_bin(track.steps[track.loop])
+  bin = utils.dec_to_bin(track.steps[track.loop])
   if vials[t].rotations > #bin then
     vials[t].rotations = 0
   end
   x = tostring(bin)
-  vials[t].seq = vials_utils.split_str(x)
+  vials[t].seq = utils.split_str(x)
   screen_dirty = true
   grid_dirty = true
 end
@@ -378,17 +390,17 @@ function generate_sequence(t)
   local seq_string = binary_string(t)
   local seq_tab
   if vials[t].loop == 0 then
-    seq_tab = vials_utils.split_str(seq_string)
+    seq_tab = utils.split_str(seq_string)
   else
-    local x = vials_utils.dec_to_bin(vials[t].steps[vials[t].loop])
-    seq_tab = vials_utils.split_str(x)
+    local x = utils.dec_to_bin(vials[t].steps[vials[t].loop])
+    seq_tab = utils.split_str(x)
   end
-  local seq_rotates = vials_utils.rotate(seq_tab, vials[t].rotations)
+  local seq_rotates = utils.rotate(seq_tab, vials[t].rotations)
   return seq_rotates
 end
 
 function change_focus()
-  decimal_value = vials[track].steps[selected + 1]
+  decimal_value = vials[track_ix].steps[unit_ix + 1]
   binary_input = calc_binary_input()
   calc_input = {}
   screen_dirty = true
@@ -402,19 +414,19 @@ function loop_off(t)
   grid_dirty = true
 end
 
-function change_selected(inp)
-  selected = (selected + inp) % 4
+function change_unit_ix(inp)
+  unit_ix = (unit_ix + inp) % 4
   change_focus()
 end
 
 function change_decimal(d)
-  local vial = vials[track]
-  decimal_value = ((vial.steps[selected + 1] + d) % 256)
-  vial.steps[selected + 1] = decimal_value
+  local vial = vials[track_ix]
+  decimal_value = ((vial.steps[unit_ix + 1] + d) % 256)
+  vial.steps[unit_ix + 1] = decimal_value
   if vial.loop == 0 then
-    vials[track].seq = generate_sequence(track)
-  elseif vial.loop == selected + 1 then
-    loop_on(track)
+    vials[track_ix].seq = generate_sequence(track_ix)
+  elseif vial.loop == unit_ix + 1 then
+    loop_on(track_ix)
   end
   binary_input = calc_binary_input()
   screen_dirty = true
@@ -438,10 +450,10 @@ end
 
 function position_vis()
   local phase
-  if vials[track].loop > 0 then
-    phrase = vials_utils.dec_to_bin(vials[track].steps[vials[track].loop])
+  if vials[track_ix].loop > 0 then
+    phrase = utils.dec_to_bin(vials[track_ix].steps[vials[track_ix].loop])
   else
-    phrase = binary_string(track)
+    phrase = binary_string(track_ix)
   end
   local temp = {} -- rotate
 
@@ -451,15 +463,15 @@ function position_vis()
       table.insert(temp, c)
     end
   )
-  phrase_rotated = vials_utils.rotate(temp, vials[track].rotations)
-  phrase = vials_utils.concatenate_table(phrase_rotated)
-  if vials[track].pos > 0 then
-    screen.text(string.sub(phrase, 1, vials[track].pos - 1))
+  phrase_rotated = utils.rotate(temp, vials[track_ix].rotations)
+  phrase = utils.concatenate_table(phrase_rotated)
+  if vials[track_ix].pos > 0 then
+    screen.text(string.sub(phrase, 1, vials[track_ix].pos - 1))
   end
   screen.level(value_color)
-  screen.text(string.sub(phrase, vials[track].pos, vials[track].pos))
+  screen.text(string.sub(phrase, vials[track_ix].pos, vials[track_ix].pos))
   screen.level(color)
-  screen.text(string.sub(phrase, vials[track].pos + 1, #phrase))
+  screen.text(string.sub(phrase, vials[track_ix].pos + 1, #phrase))
 end
 
 function redraw()
@@ -485,7 +497,7 @@ function redraw()
     screen.font_face(15)
     screen.level(color)
     position_vis()
-    screen.move((vials[track].rotations + 0.2) * 3.9999, 21)
+    screen.move((vials[track_ix].rotations + 0.2) * 3.9999, 21)
     screen.text("_")
     screen.font_face(number_font)
     screen.font_size(8)
@@ -493,10 +505,10 @@ function redraw()
     screen.move(0, screen_y)
     for row = 1, 4 do -- draw table
       for col = 1, 4 do
-        screen.level(vials_utils.get_binary_density(vials[row].steps[col]))
+        screen.level(utils.get_binary_density(vials[row].steps[col]))
         screen.rect(screen_x, screen_y, 15, 8)
         screen.fill()
-        if row == track and col == selected + 1 then
+        if row == track_ix and col == unit_ix + 1 then
           screen.level(2)
           screen.move(screen_x + 15, screen_y + 5)
           screen.font_size(6)
@@ -517,8 +529,8 @@ function redraw()
     screen.text("div ")
     screen.level(value_color)
     screen.font_face(number_font)
-    screen.text(vials[track].division)
-    if vials[track].mute == 1 then
+    screen.text(vials[track_ix].division)
+    if vials[track_ix].mute == 1 then
       screen.font_face(word_font)
       screen.text("   m")
     end
@@ -528,7 +540,7 @@ function redraw()
     screen.text("prob ")
     screen.level(value_color)
     screen.font_face(number_font)
-    screen.text(vials[track].prob)
+    screen.text(vials[track_ix].prob)
     screen.font_face(word_font)
     screen.text("%")
     screen.move(80, 52)
@@ -538,7 +550,7 @@ function redraw()
     screen.move(80, 62)
     screen.level(value_color)
     screen.font_face(number_font)
-    screen.text(vials_utils.dec_to_bin(decimal_value))
+    screen.text(utils.dec_to_bin(decimal_value))
     screen.update()
   elseif delay_view > 0 then
     screen_x = (15 * params:get("delay_rate"))
@@ -564,7 +576,7 @@ function redraw()
     screen.fill()
     screen.update()
   elseif param_view > 0 then
-    local sample_name = vials_utils.split(params:get(param_view .. "_sample"), "/")
+    local sample_name = utils.split(params:get(param_view .. "_sample"), "/")
     screen.font_face(word_font)
     screen.move(5, 20)
     screen.text("track " .. param_view)
@@ -576,9 +588,9 @@ function redraw()
       screen.level(color)
     end
     screen.move(5, 40)
-    screen.text("vol " .. vials_utils.round(params:get(param_view .. "_vol"), 3))
+    screen.text("vol " .. utils.round(params:get(param_view .. "_vol"), 3))
     screen.move(5, 50)
-    screen.text("speed " .. vials_utils.round(params:get(param_view .. "_speed"), 3))
+    screen.text("speed " .. utils.round(params:get(param_view .. "_speed"), 3))
     screen.move(5, 60)
     screen.text("dist " .. params:get(param_view .. "_dist"))
     if param_sel == 2 then
@@ -589,9 +601,9 @@ function redraw()
     screen.move(60, 40)
     screen.text("cutoff " .. mceil(params:get(param_view .. "_filter_cutoff")))
     screen.move(60, 50)
-    screen.text("res " .. vials_utils.round(params:get(param_view .. "_filter_res"), 3))
+    screen.text("res " .. utils.round(params:get(param_view .. "_filter_res"), 3))
     screen.move(60, 60)
-    screen.text("env amt " .. vials_utils.round(params:get(param_view .. "_filter_env_mod"), 2))
+    screen.text("env amt " .. utils.round(params:get(param_view .. "_filter_env_mod"), 2))
     screen.update()
   end
 end
@@ -615,7 +627,7 @@ function key(n, z)
     if n == 2 then --key 2 CHANGE SLOT
       if z == 1 and not key1_hold and not key3_hold then
         key2_hold = true
-        change_selected(z)
+        change_unit_ix(z)
       elseif z == 0 then
         key2_hold = false
       end
@@ -631,7 +643,7 @@ function key(n, z)
       rotate_track("right")
     end
     if n == 3 and z == 1 and key2_hold then -- MUTE TRACK
-      vials[track].mute = 1 - vials[track].mute
+      vials[track_ix].mute = 1 - vials[track_ix].mute
     end
   else
     if z == 1 and n > 1 then
@@ -645,14 +657,14 @@ end
 function enc(n, d)
   if delay_view < 1 and reverb_view < 1 and param_view < 1 then
     if n == 2 and not key2_hold then -- change track
-      track = util.clamp(track + d, 1, 4)
+      track_ix = util.clamp(track_ix + d, 1, 4)
       change_focus()
     end
     if n == 3 then -- change decimal
       if not key2_hold and not key3_hold then
         change_decimal(d)
       elseif key2_hold then
-        vials[track].prob = (vials[track].prob + d) % 101
+        vials[track_ix].prob = (vials[track_ix].prob + d) % 101
       elseif key3_hold then
         current_vials = util.clamp(current_vials + d, 1, 15)
         load_save(current_vials, 1)
@@ -662,8 +674,8 @@ function enc(n, d)
       params:delta("clock_tempo", d)
     end
     if n == 2 and key2_hold then -- change division
-      local div_amt = vials[track].division
-      vials[track].division = util.clamp(div_amt + d, 1, 8)
+      local div_amt = vials[track_ix].division
+      vials[track_ix].division = util.clamp(div_amt + d, 1, 8)
     end
   elseif delay_view > 0 then
     params:delta(delay_params[n], d)
@@ -727,13 +739,13 @@ function vials_load() -- load seq data
 end
 
 function menu_save()
-  vi[current_vials] = vials_utils.deepcopy(vials)
+  vi[current_vials] = utils.deepcopy(vials)
 end
 
 function load_save(x, y)
   if y == 1 then -- load
     current_vials = x
-    vials = vials_utils.deepcopy(vi[current_vials])
+    vials = utils.deepcopy(vi[current_vials])
     print("loaded: " .. x)
     for i = 1, 4 do
       vials[i].seq = generate_sequence(i)
@@ -741,7 +753,7 @@ function load_save(x, y)
     screen_dirty = true
     grid_dirty = true
   else -- save
-    vi[x] = vials_utils.deepcopy(vials)
+    vi[x] = utils.deepcopy(vials)
     print("saved: " .. x)
   end
 end
@@ -760,7 +772,7 @@ function handle_track_press(y, z)
     if muting.state then
       vials[y].mute = 1 - vials[y].mute
     else
-      track = y
+      track_ix = y
       change_focus()
     end
   elseif reverbing.state and z == 1 then
@@ -798,8 +810,8 @@ end
 function grid_4x4(x, y, low, mid, active)
   for col = y, y + 3 do -- 1, 4
     for row = x, x + 3 do -- 5, 8
-      is_selected = col == track and selected == row - 5
-      g:led(row, col, row - 4 == vials[col].loop and active or is_selected and mid or low)
+      is_unit_ix = col == track_ix and unit_ix == row - 5
+      g:led(row, col, row - 4 == vials[col].loop and active or is_unit_ix and mid or low)
     end
   end
 end
@@ -882,53 +894,53 @@ function track_shift(shift)
 end
 
 function rotate_track(dir)
-  if #vials[track].seq > 0 then
+  if #vials[track_ix].seq > 0 then
     if dir == "left" then
-      vials[track].rotations = vials[track].rotations - 1
-      if vials[track].rotations == -1 then
-        vials[track].rotations = #vials[track].seq - 1
+      vials[track_ix].rotations = vials[track_ix].rotations - 1
+      if vials[track_ix].rotations == -1 then
+        vials[track_ix].rotations = #vials[track_ix].seq - 1
       end
     else
-      vials[track].rotations = vials[track].rotations + 1
-      if vials[track].rotations >= #vials[track].seq then
-        vials[track].rotations = 0
+      vials[track_ix].rotations = vials[track_ix].rotations + 1
+      if vials[track_ix].rotations >= #vials[track_ix].seq then
+        vials[track_ix].rotations = 0
       end
     end
-    vials[track].seq = generate_sequence(track)
+    vials[track_ix].seq = generate_sequence(track_ix)
   end
 end
 
 function run_update()
-  if vials[track].loop < 1 then
-    vials[track].seq = generate_sequence(track)
-  elseif selected + 1 == vials[track].loop then
-    loop_on(track)
+  if vials[track_ix].loop < 1 then
+    vials[track_ix].seq = generate_sequence(track_ix)
+  elseif unit_ix + 1 == vials[track_ix].loop then
+    loop_on(track_ix)
   end
 end
 
 function new_pos_selector()
   calc_input = {}
-  decimal_value = vials[track].steps[selected + 1]
-  binary_input = vials_utils.split_str(vials_utils.dec_to_bin(decimal_value))
+  decimal_value = vials[track_ix].steps[unit_ix + 1]
+  binary_input = utils.split_str(utils.dec_to_bin(decimal_value))
 end
 
 -- function handle_binary_input(x)
---   if vials_utils.check_nil(binary_input) then -- if array of nil
+--   if utils.check_nil(binary_input) then -- if array of nil
 --     binary_input[x] = 1
 --     for i = x + 1, #binary_input do
 --       binary_input[i] = 0 -- fill rest of input with 0s
 --     end
 --   else
---     local index_1 = vials_utils.table_index(binary_input)
+--     local index_1 = utils.table_index(binary_input)
 --     if binary_input[x] == 1 then
---       local first_index = vials_utils.first_index(binary_input)
+--       local first_index = utils.first_index(binary_input)
 --       if x == first_index then
---         if vials_utils.tally(binary_input) == 1 then
+--         if utils.tally(binary_input) == 1 then
 --           make_nil(binary_input, first_index)
 --           decimal_value = 0
 --         else
 --           binary_input[x] = nil
---           for n = x + 1, vials_utils.first_index(binary_input) - 1 do
+--           for n = x + 1, utils.first_index(binary_input) - 1 do
 --             binary_input[n] = nil
 --           end
 --         end
@@ -944,10 +956,10 @@ end
 --       end
 --     end
 --   end
---   local binary = vials_utils.concatenate_table(binary_input)
+--   local binary = utils.concatenate_table(binary_input)
 --   local newNumber = tonumber(binary, 2)
---   vials[track].steps[selected + 1] = newNumber ~= nil and newNumber or 0
---   decimal_value = vials[track].steps[selected + 1]
+--   vials[track_ix].steps[unit_ix + 1] = newNumber ~= nil and newNumber or 0
+--   decimal_value = vials[track_ix].steps[unit_ix + 1]
 --   run_update()
 --   g:refresh()
 -- end
@@ -973,8 +985,8 @@ g.key = function(x, y, z)
       reset_positions()
     end
     if x >= 5 and x < 9 and y < 5 then
-      track = y
-      selected = x - 5
+      track_ix = y
+      unit_ix = x - 5
       new_pos_selector()
       if looping.state then
         if vials[y].loop == x - 4 then --loop
@@ -1040,12 +1052,12 @@ g.key = function(x, y, z)
   --   for iter = x, #binary_input do
   --     binary_input[iter] = nil
   --   end
-  --   if not vials_utils.check_nil(binary_input) then
-  --     binary = vials_utils.concatenate_table(binary_input)
-  --     vials[track].steps[selected + 1] = tonumber(binary, 2)
-  --     decimal_value = vials[track].steps[selected + 1]
+  --   if not utils.check_nil(binary_input) then
+  --     binary = utils.concatenate_table(binary_input)
+  --     vials[track_ix].steps[unit_ix + 1] = tonumber(binary, 2)
+  --     decimal_value = vials[track_ix].steps[unit_ix + 1]
   --   else
-  --     vials[track].steps[selected + 1] = 0
+  --     vials[track_ix].steps[unit_ix + 1] = 0
   --     decimal_value = 0
   --   end
   --   run_update()
@@ -1140,11 +1152,11 @@ function init()
   params:add {type = "trigger", id = "Save", name = "save pattern", action = menu_save}
   params:add {type = "trigger", id = "Clear", name = "clear vials", action = reset_vials}
   vials_load()
-  vials = vials_utils.deepcopy(vi[current_vials])
+  vials = utils.deepcopy(vi[current_vials])
   for init_t = 1, 4 do
     vials[init_t].seq = generate_sequence(init_t)
   end
-  track = 1
+  track_ix = 1
   change_focus()
 
   local screen_redraw_metro = metro.init()

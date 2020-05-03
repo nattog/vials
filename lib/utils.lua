@@ -1,24 +1,24 @@
-local vials_utils = {}
+local utils = {}
 
 local power = math.pow
 local mceil = math.ceil
 
-function vials_utils.deepcopy(orig)
+function utils.deepcopy(orig)
   local orig_type = type(orig)
   local copy
   if orig_type == "table" then
     copy = {}
     for orig_key, orig_value in next, orig, nil do
-      copy[vials_utils.deepcopy(orig_key)] = vials_utils.deepcopy(orig_value)
+      copy[utils.deepcopy(orig_key)] = utils.deepcopy(orig_value)
     end
-    setmetatable(copy, vials_utils.deepcopy(getmetatable(orig)))
+    setmetatable(copy, utils.deepcopy(getmetatable(orig)))
   else -- number, string, boolean, etc
     copy = orig
   end
   return copy
 end
 
-function vials_utils.split(s, delimiter)
+function utils.split(s, delimiter)
   result = {}
   for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
     table.insert(result, match)
@@ -26,24 +26,24 @@ function vials_utils.split(s, delimiter)
   return result
 end
 
-function vials_utils.count(base, pattern)
+function utils.count(base, pattern)
   return select(2, string.gsub(base, pattern, ""))
 end
 
-function vials_utils.get_binary_density(decimal)
+function utils.get_binary_density(decimal)
   if decimal == 0 then
     return 0
   end
-  binarystring = tostring(vials_utils.dec_to_bin(decimal)) or ""
-  one_count = vials_utils.count(binarystring, 1)
+  binarystring = tostring(utils.dec_to_bin(decimal)) or ""
+  one_count = utils.count(binarystring, 1)
   return math.floor((one_count / #binarystring) * 16)
 end
 
-function vials_utils.round(what, precision)
+function utils.round(what, precision)
   return math.floor(what * power(10, precision) + 0.5) / power(10, precision)
 end
 
-function vials_utils.rotate(m, dir)
+function utils.rotate(m, dir)
   if dir > 0 then
     while dir ~= 0 do
       table.insert(m, 1, m[#m])
@@ -60,7 +60,7 @@ function vials_utils.rotate(m, dir)
   return m
 end
 
-function vials_utils.dec_to_bin(num)
+function utils.dec_to_bin(num)
   local total = 0
   local modifier = 0
   local value = ""
@@ -78,7 +78,7 @@ function vials_utils.dec_to_bin(num)
   return value
 end
 
-function vials_utils.split_str(str)
+function utils.split_str(str)
   local tab = {}
   for i = 1, string.len(str) do
     tab[i] = tonumber(string.sub(str, i, i))
@@ -86,7 +86,7 @@ function vials_utils.split_str(str)
   return tab
 end
 
-function vials_utils.concatenate_table(t)
+function utils.concatenate_table(t)
   local x = ""
   local i
   for i = 1, #t do
@@ -98,7 +98,7 @@ function vials_utils.concatenate_table(t)
   return x
 end
 
-function vials_utils.table_index(t)
+function utils.table_index(t)
   local index = {}
   for k, v in pairs(t) do
     index[v] = k
@@ -106,7 +106,7 @@ function vials_utils.table_index(t)
   return index[1]
 end
 
-function vials_utils.first_index(t)
+function utils.first_index(t)
   for iter = 1, #t do
     if t[iter] == 1 then
       return iter
@@ -114,7 +114,7 @@ function vials_utils.first_index(t)
   end
 end
 
-function vials_utils.tally(t)
+function utils.tally(t)
   local freq = 0
   for iter = 1, #t do
     if t[iter] == 1 then
@@ -124,7 +124,7 @@ function vials_utils.tally(t)
   return freq
 end
 
-function vials_utils.check_nil(t)
+function utils.check_nil(t)
   for iter = 1, #t do
     if t[iter] ~= nil then
       return false
@@ -133,4 +133,4 @@ function vials_utils.check_nil(t)
   return true
 end
 
-return vials_utils
+return utils
