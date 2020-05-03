@@ -759,8 +759,8 @@ g.key = function(x, y, z)
   end
   if x == 16 and y == 5 then
     ls_view = 1 - ls_view
+    grid_dirty = true
   end
-
   if z == 1 then
     if x == 2 and y < 5 then -- mute track
       vials[y].mute = 1 - vials[y].mute
@@ -846,10 +846,6 @@ g.key = function(x, y, z)
   end
   if x == 14 and y == 7 then
     reverb_view = 0 + z
-  end
-  if x == 16 and y == 5 then
-    ls_view = 0 + z
-    grid_dirty = true
   end
   if x <= 8 and y == 8 and z == 1 then -- make a bit nil
     for iter = x, #binary_input do
