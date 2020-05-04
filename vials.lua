@@ -66,100 +66,7 @@
 local MusicUtil = require "musicutil"
 local Formatters = require "formatters"
 
--- engine
-local Timber = require "timber/lib/timber_engine"
-engine.name = "Timber"
-
-local options = {}
-options.OFF_ON = {"Off", "On"}
-options.QUANTIZATION = {"None", "1/32", "1/24", "1/16", "1/12", "1/8", "1/6", "1/4", "1/3", "1/2", "1 bar"}
-options.QUANTIZATION_DIVIDERS = {nil, 32, 24, 16, 12, 8, 6, 4, 3, 2, 1}
-
-local current_sample_id = 0
-local shift_mode = false
-local file_select_active = false
-
-local NUM_SAMPLES = 4
-local sample_status = {}
-local STATUS = {
-  STOPPED = 0,
-  STARTING = 1,
-  PLAYING = 2,
-  STOPPING = 3
-}
-for i = 0, NUM_SAMPLES - 1 do
-  sample_status[i] = STATUS.STOPPED
-end
-local current_sample_id = 0
-local function load_folder(file, add)
-  local sample_id = 0
-  if add then
-    for i = NUM_SAMPLES - 1, 0, -1 do
-      if Timber.samples_meta[i].num_frames > 0 then
-        sample_id = i + 1
-        break
-      end
-    end
-  end
-
-  Timber.clear_samples(sample_id, NUM_SAMPLES - 1)
-
-  local split_at = string.match(file, "^.*()/")
-  local folder = string.sub(file, 1, split_at)
-  file = string.sub(file, split_at + 1)
-
-  local found = false
-  for k, v in ipairs(Timber.FileSelect.list) do
-    if v == file then
-      found = true
-    end
-    if found then
-      if sample_id > 255 then
-        print("Max files loaded")
-        break
-      end
-      -- Check file type
-      local lower_v = v:lower()
-      if
-        string.find(lower_v, ".wav") or string.find(lower_v, ".aif") or string.find(lower_v, ".aiff") or
-          string.find(lower_v, ".ogg")
-       then
-        Timber.load_sample(sample_id, folder .. v)
-        sample_id = sample_id + 1
-      else
-        print("Skipped", v)
-      end
-    end
-  end
-end
-
-local function set_sample_id(id)
-  current_sample_id = id
-  while current_sample_id >= NUM_SAMPLES do
-    current_sample_id = current_sample_id - NUM_SAMPLES
-  end
-  while current_sample_id < 0 do
-    current_sample_id = current_sample_id + NUM_SAMPLES
-  end
-end
-
-local function eng_note_on(sample_id, vel)
-  if Timber.samples_meta[sample_id].num_frames > 0 then
-    -- print("note_on", sample_id)
-    vel = vel or 1
-    engine.noteOn(sample_id, MusicUtil.note_num_to_freq(60), vel, sample_id)
-    sample_status[sample_id] = STATUS.PLAYING
-    screen_dirty = true
-    grid_dirty = true
-  end
-end
-
-local function eng_note_off(sample_id)
-  -- print("note_off", sample_id)
-  engine.noteOff(sample_id)
-  screen_dirty = true
-  grid_dirty = true
-end
+local engines = include("lib/engines")
 
 -- libraries
 local ControlSpec = require "controlspec"
@@ -328,7 +235,7 @@ local function trigger(t, pos)
   local midi_send = (params:get("send_midi") == 1 and midi_out_device ~= nil and midi_out_channel ~= nil)
   -- trigger note
   if vials[t].seq[pos] == 1 and rand(100) <= vials[t].prob and vials[t].mute == 0 then
-    eng_note_on(t - 1, 1)
+    engines.note_on(t - 1, 1)
     if midi_send then
       local note = params:get(t .. ":_midi_note")
       midi_out_device:note_on(note, 100, midi_out_channel)
@@ -340,7 +247,7 @@ end
 function count()
   meta_position = (meta_position % 16) + 1
   for t = 1, 4 do
-    eng_note_off(t - 1)
+    engines.note_off(t - 1)
     -- check division
     div = clock_divider(t)
     local counter = meta_position % div
@@ -1002,7 +909,7 @@ g.key = function(x, y, z)
     end
   --   if x == 10 and y == 8 then
   --     delay_in = 1 - delay_in
-  --     audio.level_eng_cut(delay_in)
+  --     audio.level_engines.cut(delay_in)
   --   end
   --   if x == 12 and y == 8 then
   --     params:set("delay_rate", (rand(200)) / 100)
@@ -1083,30 +990,7 @@ g.key = function(x, y, z)
 end
 
 function init()
-  Timber.add_params()
-  params:add_separator()
-  -- Index zero to align with MIDI note numbers
-  for i = 0, NUM_SAMPLES - 1 do
-    local extra_params = {
-      {
-        type = "option",
-        id = "launch_mode_" .. i,
-        name = "Launch Mode",
-        options = {"Gate", "Toggle"},
-        default = 1,
-        action = function(value)
-          Timber.setup_params_dirty = true
-        end
-      }
-    }
-    Timber.add_sample_params(i, true, extra_params)
-  end
-  -- params:add_group("ENGINE", 99)
-  -- for channel = 1, 4 do
-  --   ack.add_channel_params(channel)
-  --   params:add_separator()
-  -- end
-  -- ack.add_effects_params()
+  engines.init()
 
   params:add_separator()
   for id, device in pairs(midi.vports) do
